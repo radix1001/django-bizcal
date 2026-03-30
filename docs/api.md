@@ -72,7 +72,16 @@ Substitutes the full schedule of specific dates while delegating the rest to a b
 All calendar implementations expose:
 
 - `is_business_day(value)`
+- `iter_business_days(start, end, inclusive=True)`
+- `list_business_days(start, end, inclusive=True)`
+- `count_business_days(start, end, inclusive=True)`
+- `next_business_day(day)`
+- `previous_business_day(day)`
 - `is_business_time(dt)`
+- `opening_for_day(day, tz=None)`
+- `closing_for_day(day, tz=None)`
+- `next_opening_datetime(dt)`
+- `previous_closing_datetime(dt)`
 - `next_business_datetime(dt)`
 - `previous_business_datetime(dt)`
 - `add_business_time(dt, delta)`
@@ -87,6 +96,8 @@ Notes:
 
 - Datetime operations require aware datetimes.
 - `business_windows_for_day(...)` returns `BusinessInterval` values.
+- `next_business_day(...)` and `previous_business_day(...)` are inclusive of the input day.
+- `next_opening_datetime(...)` and `previous_closing_datetime(...)` return real schedule boundaries, even when the input lies outside business time.
 - `previous_business_datetime(...)` may return the closing boundary of the last open interval when the input is outside business time.
 
 ## Builder
@@ -120,3 +131,20 @@ Composition keys:
 - `difference`: `base` and `subtract`, or `children` with exactly two items
 - `override`: `base` and `overrides`
 
+### `CalendarBuilder.to_dict(...)`
+
+Serializes supported calendars back into declarative configuration suitable for:
+
+- Django settings
+- cache payloads
+- fixtures
+- round-trip reconstruction with `CalendarBuilder.from_dict(...)`
+
+Public configuration typing is also exported:
+
+- `CalendarConfig`
+- `WorkingCalendarConfig`
+- `UnionCalendarConfig`
+- `IntersectionCalendarConfig`
+- `DifferenceCalendarConfig`
+- `OverrideCalendarConfig`

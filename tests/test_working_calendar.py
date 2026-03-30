@@ -76,10 +76,67 @@ def test_navigation_helpers_snap_to_open_time_and_boundary(
     support_calendar: WorkingCalendar,
 ) -> None:
     tz = ZoneInfo("America/Santiago")
+    current = datetime(2026, 3, 2, 10, 30, tzinfo=tz)
+    assert support_calendar.next_business_datetime(current) == current
+    assert support_calendar.previous_business_datetime(current) == current
     assert support_calendar.next_business_datetime(
         datetime(2026, 3, 2, 13, 30, tzinfo=tz)
     ) == datetime(2026, 3, 2, 14, 0, tzinfo=tz)
     assert support_calendar.previous_business_datetime(
+        datetime(2026, 3, 2, 13, 30, tzinfo=tz)
+    ) == datetime(2026, 3, 2, 13, 0, tzinfo=tz)
+
+
+def test_day_level_helpers_cover_iteration_count_and_navigation(
+    support_calendar: WorkingCalendar,
+) -> None:
+    assert list(support_calendar.iter_business_days("2026-03-02", "2026-03-06")) == [
+        date(2026, 3, 2),
+        date(2026, 3, 3),
+        date(2026, 3, 4),
+        date(2026, 3, 5),
+        date(2026, 3, 6),
+    ]
+    assert support_calendar.list_business_days("2026-03-05", "2026-03-08") == [
+        date(2026, 3, 5),
+        date(2026, 3, 6),
+    ]
+    assert support_calendar.count_business_days("2026-03-05", "2026-03-08") == 2
+    assert support_calendar.count_business_days(
+        "2026-03-05",
+        "2026-03-06",
+        inclusive=False,
+    ) == 1
+    assert support_calendar.next_business_day("2026-03-07") == date(2026, 3, 9)
+    assert support_calendar.previous_business_day("2026-03-07") == date(2026, 3, 6)
+
+
+def test_opening_and_closing_helpers_expose_day_boundaries(
+    support_calendar: WorkingCalendar,
+) -> None:
+    tz = ZoneInfo("America/Santiago")
+    assert support_calendar.opening_for_day("2026-03-02") == datetime(
+        2026,
+        3,
+        2,
+        9,
+        0,
+        tzinfo=tz,
+    )
+    assert support_calendar.closing_for_day("2026-03-02") == datetime(
+        2026,
+        3,
+        2,
+        18,
+        0,
+        tzinfo=tz,
+    )
+    assert support_calendar.opening_for_day("2026-03-07") is None
+    assert support_calendar.closing_for_day("2026-03-07") is None
+    assert support_calendar.next_opening_datetime(
+        datetime(2026, 3, 2, 13, 30, tzinfo=tz)
+    ) == datetime(2026, 3, 2, 14, 0, tzinfo=tz)
+    assert support_calendar.previous_closing_datetime(
         datetime(2026, 3, 2, 13, 30, tzinfo=tz)
     ) == datetime(2026, 3, 2, 13, 0, tzinfo=tz)
 

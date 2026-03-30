@@ -157,6 +157,33 @@ calendar = CalendarBuilder.from_dict(
 )
 ```
 
+The builder also supports serialization back to declarative config:
+
+```python
+from django_bizcal import CalendarBuilder
+
+config = CalendarBuilder.to_dict(calendar)
+restored = CalendarBuilder.from_dict(config)
+```
+
+## API ergonomics
+
+Common day- and boundary-level helpers are part of the public API:
+
+- `iter_business_days(...)`, `list_business_days(...)`, `count_business_days(...)`
+- `next_business_day(...)`, `previous_business_day(...)`
+- `opening_for_day(...)`, `closing_for_day(...)`
+- `next_opening_datetime(...)`, `previous_closing_datetime(...)`
+
+Typed declarative config helpers are also exported for IDE and static typing support:
+
+- `CalendarConfig`
+- `WorkingCalendarConfig`
+- `UnionCalendarConfig`
+- `IntersectionCalendarConfig`
+- `DifferenceCalendarConfig`
+- `OverrideCalendarConfig`
+
 ## Architecture
 
 - The domain core lives in `src/django_bizcal` and stays framework-light.

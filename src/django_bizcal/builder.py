@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from datetime import time
 from typing import Any, cast
 
 from .calendars.base import BusinessCalendar
@@ -14,6 +15,17 @@ from .calendars.composite import (
     UnionCalendar,
 )
 from .calendars.working import DayOverrideInput, WeeklyScheduleInput, WorkingCalendar
+from .config import (
+    CalendarConfig,
+    DayOverrideConfig,
+    DifferenceCalendarConfig,
+    IntersectionCalendarConfig,
+    OverrideCalendarConfig,
+    TimePairConfig,
+    UnionCalendarConfig,
+    WeeklyScheduleConfig,
+    WorkingCalendarConfig,
+)
 from .exceptions import CalendarConfigurationError
 from .providers import (
     CompositeHolidayProvider,
@@ -30,7 +42,7 @@ class CalendarBuilder:
     @classmethod
     def from_dict(
         cls,
-        config: Mapping[str, Any],
+        config: CalendarConfig | Mapping[str, Any],
         *,
         default_tz: str | None = None,
         default_country: str | None = None,
@@ -71,6 +83,41 @@ class CalendarBuilder:
             )
             return OverrideCalendar(base, overrides, tz=config.get("tz"))
         raise CalendarConfigurationError(f"Unsupported calendar type: {calendar_type!r}.")
+
+    @classmethod
+    def to_dict(cls, calendar: BusinessCalendar) -> CalendarConfig:
+        """Serialize a supported calendar implementation into declarative config."""
+        if isinstance(calendar, WorkingCalendar):
+            return cls._serialize_working(calendar)
+        if isinstance(calendar, UnionCalendar):
+            return UnionCalendarConfig(
+                type="union",
+                tz=calendar.tz.key,
+                children=[cls.to_dict(child) for child in calendar.children],
+            )
+        if isinstance(calendar, IntersectionCalendar):
+            return IntersectionCalendarConfig(
+                type="intersection",
+                tz=calendar.tz.key,
+                children=[cls.to_dict(child) for child in calendar.children],
+            )
+        if isinstance(calendar, DifferenceCalendar):
+            return DifferenceCalendarConfig(
+                type="difference",
+                tz=calendar.tz.key,
+                base=cls.to_dict(calendar.base),
+                subtract=cls.to_dict(calendar.subtract),
+            )
+        if isinstance(calendar, OverrideCalendar):
+            return OverrideCalendarConfig(
+                type="override",
+                tz=calendar.tz.key,
+                base=cls.to_dict(calendar.base),
+                overrides=cls._serialize_day_overrides(calendar.overrides),
+            )
+        raise CalendarConfigurationError(
+            f"CalendarBuilder.to_dict does not support {calendar.__class__.__name__!r}."
+        )
 
     @classmethod
     def _build_working(
@@ -188,10 +235,8 @@ class CalendarBuilder:
         children = cls._build_children(config, default_tz, default_country, preload_years)
         if len(children) != 2:
             raise CalendarConfigurationError(
-                
-                    "Difference calendar requires exactly two child calendars "
-                    "or explicit base/subtract."
-                
+                "Difference calendar requires exactly two child calendars "
+                "or explicit base/subtract."
             )
         return children[0], children[1]
 
@@ -200,3 +245,120 @@ class CalendarBuilder:
         if not isinstance(value, Mapping):
             raise CalendarConfigurationError(f"'{field_name}' must be a mapping.")
         return value
+
+    @classmethod
+    def _serialize_working(cls, calendar: WorkingCalendar) -> WorkingCalendarConfig:
+        config: WorkingCalendarConfig = WorkingCalendarConfig(
+            type="working",
+            tz=calendar.tz.key,
+            weekly_schedule=cls._serialize_weekly_schedule(calendar.weekly_schedule),
+        )
+        holiday_config = cls._serialize_holiday_provider(calendar.holiday_provider)
+        if "country" in holiday_config:
+            config["country"] = cast(str, holiday_config["country"])
+        if "years" in holiday_config:
+            config["years"] = cast(list[int], holiday_config["years"])
+        if "subdivision" in holiday_config and holiday_config["subdivision"] is not None:
+            config["subdivision"] = cast(str, holiday_config["subdivision"])
+        if "observed" in holiday_config:
+            config["observed"] = cast(bool, holiday_config["observed"])
+        if "extra_holidays" in holiday_config:
+            config["extra_holidays"] = cast(list[str], holiday_config["extra_holidays"])
+        if calendar.day_overrides:
+            config["day_overrides"] = cls._serialize_day_overrides(calendar.day_overrides)
+        if calendar.name is not None:
+            config["name"] = calendar.name
+        return config
+
+    @classmethod
+    def _serialize_holiday_provider(
+        cls,
+        provider: HolidayProvider | None,
+    ) -> dict[str, Any]:
+        if provider is None:
+            return {}
+        if isinstance(provider, HolidaysProvider):
+            payload: dict[str, Any] = {
+                "country": provider.country,
+                "years": list(provider.years),
+            }
+            if provider.subdivision is not None:
+                payload["subdivision"] = provider.subdivision
+            if provider.observed is not True:
+                payload["observed"] = provider.observed
+            return payload
+        if isinstance(provider, SetHolidayProvider):
+            return {
+                "extra_holidays": [current.isoformat() for current in sorted(provider.days)],
+            }
+        if isinstance(provider, CompositeHolidayProvider):
+            combined_payload: dict[str, Any] = {}
+            extra_holidays: list[str] = []
+            for current in provider.providers:
+                if isinstance(current, HolidaysProvider):
+                    if "country" in combined_payload:
+                        raise CalendarConfigurationError(
+                            "Multiple official holiday providers are not serializable."
+                        )
+                    combined_payload.update(cls._serialize_holiday_provider(current))
+                elif isinstance(current, SetHolidayProvider):
+                    extra_holidays.extend(
+                        current_day.isoformat() for current_day in sorted(current.days)
+                    )
+                else:
+                    raise CalendarConfigurationError(
+                        f"Unsupported holiday provider {current.__class__.__name__!r}."
+                    )
+            if extra_holidays:
+                combined_payload["extra_holidays"] = sorted(set(extra_holidays))
+            return combined_payload
+        raise CalendarConfigurationError(
+            f"Unsupported holiday provider {provider.__class__.__name__!r}."
+        )
+
+    @staticmethod
+    def _serialize_weekly_schedule(
+        schedule: Mapping[int, Sequence[Any]],
+    ) -> WeeklyScheduleConfig:
+        serialized: WeeklyScheduleConfig = {}
+        for weekday, windows in schedule.items():
+            serialized[str(weekday)] = [
+                CalendarBuilder._serialize_time_pair(
+                    window.start,
+                    window.end,
+                )
+                for window in windows
+            ]
+        return serialized
+
+    @staticmethod
+    def _serialize_day_overrides(
+        overrides: Mapping[Any, Sequence[Any]],
+    ) -> DayOverrideConfig:
+        serialized: DayOverrideConfig = {}
+        for day, windows in overrides.items():
+            serialized[day.isoformat()] = (
+                None
+                if not windows
+                else [
+                    CalendarBuilder._serialize_time_pair(
+                        window.start,
+                        window.end,
+                    )
+                    for window in windows
+                ]
+            )
+        return serialized
+
+    @staticmethod
+    def _serialize_time_pair(start: time, end: time) -> TimePairConfig:
+        return (
+            CalendarBuilder._serialize_time_value(start),
+            CalendarBuilder._serialize_time_value(end),
+        )
+
+    @staticmethod
+    def _serialize_time_value(value: time) -> str:
+        if value.second == 0 and value.microsecond == 0:
+            return value.strftime("%H:%M")
+        return value.replace(microsecond=0).isoformat()

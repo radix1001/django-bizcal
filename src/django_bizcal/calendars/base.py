@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from zoneinfo import ZoneInfo
 
@@ -86,6 +87,65 @@ class BusinessCalendar(ABC):
         """Return whether the given calendar day has at least one business interval."""
         return bool(self._business_windows_for_day_local(_coerce_day_in_timezone(value, self.tz)))
 
+    def iter_business_days(
+        self,
+        start: DateInput,
+        end: DateInput,
+        *,
+        inclusive: bool = True,
+    ) -> Iterator[date]:
+        """Iterate over business days between two day-like values."""
+        start_day = _coerce_day_in_timezone(start, self.tz)
+        end_day = _coerce_day_in_timezone(end, self.tz)
+        if start_day > end_day:
+            raise ValueError("start must not be later than end.")
+        final_day = end_day if inclusive else end_day - timedelta(days=1)
+        current_day = start_day
+        while current_day <= final_day:
+            if self.is_business_day(current_day):
+                yield current_day
+            current_day += timedelta(days=1)
+
+    def list_business_days(
+        self,
+        start: DateInput,
+        end: DateInput,
+        *,
+        inclusive: bool = True,
+    ) -> list[date]:
+        """Return business days between two day-like values as a list."""
+        return list(self.iter_business_days(start, end, inclusive=inclusive))
+
+    def count_business_days(
+        self,
+        start: DateInput,
+        end: DateInput,
+        *,
+        inclusive: bool = True,
+    ) -> int:
+        """Return the number of business days between two day-like values."""
+        return sum(1 for _ in self.iter_business_days(start, end, inclusive=inclusive))
+
+    def next_business_day(self, value: DateInput) -> date:
+        """Return the next business day on or after the given day-like value."""
+        current_day = _coerce_day_in_timezone(value, self.tz)
+        for offset in range(_SEARCH_HORIZON_DAYS):
+            day = current_day + timedelta(days=offset)
+            if self.is_business_day(day):
+                return day
+        raise CalendarRangeError("Unable to find the next business day within the search horizon.")
+
+    def previous_business_day(self, value: DateInput) -> date:
+        """Return the previous business day on or before the given day-like value."""
+        current_day = _coerce_day_in_timezone(value, self.tz)
+        for offset in range(_SEARCH_HORIZON_DAYS):
+            day = current_day - timedelta(days=offset)
+            if self.is_business_day(day):
+                return day
+        raise CalendarRangeError(
+            "Unable to find the previous business day within the search horizon."
+        )
+
     def is_business_time(self, value: datetime) -> bool:
         """Return whether the aware datetime falls inside a business interval."""
         current = ensure_aware(value, param_name="value")
@@ -94,13 +154,71 @@ class BusinessCalendar(ABC):
             for interval in self.business_windows_for_day(current, tz=self.tz)
         )
 
+    def opening_for_day(
+        self,
+        day: DateInput,
+        *,
+        tz: RenderTzInput | None = None,
+    ) -> datetime | None:
+        """Return the first opening datetime for the given day, if any."""
+        intervals = self.business_windows_for_day(day, tz=tz)
+        if not intervals:
+            return None
+        return intervals[0].start
+
+    def closing_for_day(
+        self,
+        day: DateInput,
+        *,
+        tz: RenderTzInput | None = None,
+    ) -> datetime | None:
+        """Return the final closing datetime for the given day, if any."""
+        intervals = self.business_windows_for_day(day, tz=tz)
+        if not intervals:
+            return None
+        return intervals[-1].end
+
+    def next_opening_datetime(self, value: datetime) -> datetime:
+        """Return the next opening boundary at or after the given datetime."""
+        current = ensure_aware(value, param_name="value")
+        target_tzinfo = current.tzinfo
+        current = current.astimezone(target_tzinfo)
+        day = current.date()
+        for _ in range(_SEARCH_HORIZON_DAYS):
+            intervals = self.business_windows_for_day(day, tz=target_tzinfo)
+            for interval in intervals:
+                if current <= interval.start:
+                    return interval.start
+            current = datetime.combine(day + timedelta(days=1), time.min, tzinfo=target_tzinfo)
+            day = current.date()
+        raise CalendarRangeError(
+            "Unable to find the next opening datetime within the search horizon."
+        )
+
+    def previous_closing_datetime(self, value: datetime) -> datetime:
+        """Return the previous closing boundary at or before the given datetime."""
+        current = ensure_aware(value, param_name="value")
+        target_tzinfo = current.tzinfo
+        current = current.astimezone(target_tzinfo)
+        day = current.date()
+        for _ in range(_SEARCH_HORIZON_DAYS):
+            intervals = self.business_windows_for_day(day, tz=target_tzinfo)
+            for interval in reversed(intervals):
+                if current >= interval.end:
+                    return interval.end
+            current = datetime.combine(day - timedelta(days=1), time.max, tzinfo=target_tzinfo)
+            day = current.date()
+        raise CalendarRangeError(
+            "Unable to find the previous closing datetime within the search horizon."
+        )
+
     def next_business_datetime(self, value: datetime) -> datetime:
         """Return the next business datetime or boundary at or after the given datetime."""
         current = ensure_aware(value, param_name="value")
         target_tzinfo = current.tzinfo
         current = current.astimezone(target_tzinfo)
-        for offset in range(_SEARCH_HORIZON_DAYS):
-            day = current.date() + timedelta(days=offset)
+        day = current.date()
+        for _ in range(_SEARCH_HORIZON_DAYS):
             intervals = self.business_windows_for_day(day, tz=target_tzinfo)
             for interval in intervals:
                 if interval.start <= current < interval.end:
@@ -108,6 +226,7 @@ class BusinessCalendar(ABC):
                 if current < interval.start:
                     return interval.start
             current = datetime.combine(day + timedelta(days=1), time.min, tzinfo=target_tzinfo)
+            day = current.date()
         raise CalendarRangeError(
             "Unable to find the next business datetime within the search horizon."
         )
@@ -117,8 +236,8 @@ class BusinessCalendar(ABC):
         current = ensure_aware(value, param_name="value")
         target_tzinfo = current.tzinfo
         current = current.astimezone(target_tzinfo)
-        for offset in range(_SEARCH_HORIZON_DAYS):
-            day = current.date() - timedelta(days=offset)
+        day = current.date()
+        for _ in range(_SEARCH_HORIZON_DAYS):
             intervals = self.business_windows_for_day(day, tz=target_tzinfo)
             for interval in reversed(intervals):
                 if interval.start <= current <= interval.end:
@@ -126,6 +245,7 @@ class BusinessCalendar(ABC):
                 if current > interval.end:
                     return interval.end
             current = datetime.combine(day - timedelta(days=1), time.max, tzinfo=target_tzinfo)
+            day = current.date()
         raise CalendarRangeError(
             "Unable to find the previous business datetime within the search horizon."
         )

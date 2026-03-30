@@ -146,6 +146,24 @@ def test_add_business_time_zero_and_reverse_queries() -> None:
     assert calendar.business_minutes_between(outside, outside) == 0.0
 
 
+def test_empty_calendar_and_invalid_day_ranges_raise_clear_errors() -> None:
+    calendar = WorkingCalendar(tz="UTC", weekly_schedule={})
+    with pytest.raises(ValueError):
+        list(calendar.iter_business_days("2026-03-03", "2026-03-02"))
+    with pytest.raises(CalendarRangeError):
+        calendar.next_business_day("2026-03-02")
+    with pytest.raises(CalendarRangeError):
+        calendar.previous_business_day("2026-03-02")
+    with pytest.raises(CalendarRangeError):
+        calendar.next_opening_datetime(datetime(2026, 3, 2, 9, 0, tzinfo=ZoneInfo("UTC")))
+    with pytest.raises(CalendarRangeError):
+        calendar.previous_closing_datetime(datetime(2026, 3, 2, 9, 0, tzinfo=ZoneInfo("UTC")))
+    with pytest.raises(CalendarRangeError):
+        calendar.next_business_datetime(datetime(2026, 3, 2, 9, 0, tzinfo=ZoneInfo("UTC")))
+    with pytest.raises(CalendarRangeError):
+        calendar.previous_business_datetime(datetime(2026, 3, 2, 9, 0, tzinfo=ZoneInfo("UTC")))
+
+
 def test_dst_backward_interval_duration_reflects_extra_hour() -> None:
     calendar = WorkingCalendar(
         tz="America/New_York",
