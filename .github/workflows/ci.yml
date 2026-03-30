@@ -24,7 +24,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]" "Django==${{ matrix.django-version }}.*"
       - name: Run tests
-        run: pytest
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.13" ] && [ "${{ matrix.django-version }}" = "5.1" ]; then
+            pytest --cov=django_bizcal --cov-report=term-missing
+          else
+            pytest
+          fi
       - name: Build package
         run: python -m build
-

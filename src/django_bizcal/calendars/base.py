@@ -67,8 +67,7 @@ class BusinessCalendar(ABC):
         if start == end:
             return ()
         target_tzinfo = start.tzinfo if tz is None else _resolve_render_tz(tz)
-        if target_tzinfo is None:
-            raise ValueError("A target timezone is required for range queries.")
+        assert target_tzinfo is not None
         range_start = start.astimezone(target_tzinfo)
         range_end = end.astimezone(target_tzinfo)
         local_start = start.astimezone(self.tz) - timedelta(days=1)
@@ -99,8 +98,6 @@ class BusinessCalendar(ABC):
         """Return the next business datetime or boundary at or after the given datetime."""
         current = ensure_aware(value, param_name="value")
         target_tzinfo = current.tzinfo
-        if target_tzinfo is None:
-            raise ValueError("A timezone-aware datetime is required.")
         current = current.astimezone(target_tzinfo)
         for offset in range(_SEARCH_HORIZON_DAYS):
             day = current.date() + timedelta(days=offset)
@@ -119,8 +116,6 @@ class BusinessCalendar(ABC):
         """Return the previous business datetime or closing boundary at or before the input."""
         current = ensure_aware(value, param_name="value")
         target_tzinfo = current.tzinfo
-        if target_tzinfo is None:
-            raise ValueError("A timezone-aware datetime is required.")
         current = current.astimezone(target_tzinfo)
         for offset in range(_SEARCH_HORIZON_DAYS):
             day = current.date() - timedelta(days=offset)
@@ -179,8 +174,6 @@ class BusinessCalendar(ABC):
     def _add_positive_business_time(self, start: datetime, remaining: timedelta) -> datetime:
         cursor = start if self.is_business_time(start) else self.next_business_datetime(start)
         target_tzinfo = cursor.tzinfo
-        if target_tzinfo is None:
-            raise ValueError("A timezone-aware datetime is required.")
         for _ in range(_SEARCH_HORIZON_DAYS):
             intervals = self.business_windows_for_day(cursor.date(), tz=target_tzinfo)
             for interval in intervals:
@@ -202,8 +195,6 @@ class BusinessCalendar(ABC):
     def _add_negative_business_time(self, start: datetime, remaining: timedelta) -> datetime:
         cursor = start if self.is_business_time(start) else self.previous_business_datetime(start)
         target_tzinfo = cursor.tzinfo
-        if target_tzinfo is None:
-            raise ValueError("A timezone-aware datetime is required.")
         for _ in range(_SEARCH_HORIZON_DAYS):
             intervals = self.business_windows_for_day(cursor.date(), tz=target_tzinfo)
             for interval in reversed(intervals):
