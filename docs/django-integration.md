@@ -21,7 +21,9 @@ Supported settings:
 - `BIZCAL_DEFAULT_COUNTRY`
 - `BIZCAL_PRELOAD_YEARS`
 - `BIZCAL_ENABLE_DB_MODELS`
+- `BIZCAL_DEFAULT_CALENDAR_NAME`
 - `BIZCAL_DEFAULT_CALENDAR`
+- `BIZCAL_CALENDARS`
 
 ### `BIZCAL_DEFAULT_TIMEZONE`
 
@@ -50,6 +52,72 @@ Optional serializable dictionary consumed by `CalendarBuilder.from_dict(...)`.
 
 If omitted, django-bizcal builds a default Monday to Friday `09:00-18:00` working calendar using the configured timezone, country, and preload years.
 
+### `BIZCAL_DEFAULT_CALENDAR_NAME`
+
+Logical name used by `get_default_calendar()` when multiple calendars are configured.
+
+Defaults to `default`.
+
+### `BIZCAL_CALENDARS`
+
+Optional mapping of logical calendar names to declarative calendar configs.
+
+Example:
+
+```python
+BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+BIZCAL_CALENDARS = {
+    "support": {
+        "type": "working",
+        "tz": "UTC",
+        "weekly_schedule": {
+            "0": [["09:00", "18:00"]],
+            "1": [["09:00", "18:00"]],
+            "2": [["09:00", "18:00"]],
+            "3": [["09:00", "18:00"]],
+            "4": [["09:00", "18:00"]],
+        },
+    },
+    "operations_latam": {
+        "type": "union",
+        "tz": "UTC",
+        "children": [
+            {
+                "type": "working",
+                "country": "CL",
+                "years": [2026, 2027],
+                "tz": "America/Santiago",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+            {
+                "type": "working",
+                "country": "MX",
+                "years": [2026, 2027],
+                "tz": "America/Mexico_City",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+        ],
+    },
+}
+```
+
+Rules:
+
+- If `BIZCAL_CALENDARS` is configured, `BIZCAL_DEFAULT_CALENDAR_NAME` must point to one of its entries unless `BIZCAL_DEFAULT_CALENDAR` is also configured explicitly.
+- If `BIZCAL_DEFAULT_CALENDAR` and `BIZCAL_CALENDARS[BIZCAL_DEFAULT_CALENDAR_NAME]` both define the default calendar, django-bizcal raises a configuration error instead of guessing precedence.
+
 ## Services
 
 ### `get_default_calendar()`
@@ -67,6 +135,21 @@ deadline = calendar.add_business_hours(start_dt, 8)
 
 Build a calendar from a dict using Django defaults as fallback context.
 
+### `get_calendar(name)`
+
+Return a named configured calendar and cache it for process reuse.
+
+```python
+from django_bizcal.services import get_calendar
+
+calendar = get_calendar("operations_latam")
+deadline = calendar.add_business_hours(start_dt, 6)
+```
+
+### `list_configured_calendars()`
+
+Return the configured logical calendar names from settings.
+
 ### `reset_calendar_cache()`
 
 Useful in tests or reload scenarios after changing settings.
@@ -74,6 +157,5 @@ Useful in tests or reload scenarios after changing settings.
 ## Recommended application usage
 
 - Keep calendar construction in a service layer.
-- Reuse singleton-like calendars through `get_default_calendar()` or your own cached service factories.
+- Reuse singleton-like calendars through `get_default_calendar()` and `get_calendar(name)`.
 - Pass aware datetimes from Django models or `django.utils.timezone.now()`.
-

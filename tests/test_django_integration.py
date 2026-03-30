@@ -3,10 +3,19 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
 from django.apps import apps
 
 from django_bizcal import WorkingCalendar
-from django_bizcal.services import build_calendar, get_default_calendar, now, reset_calendar_cache
+from django_bizcal.exceptions import CalendarConfigurationError
+from django_bizcal.services import (
+    build_calendar,
+    get_calendar,
+    get_default_calendar,
+    list_configured_calendars,
+    now,
+    reset_calendar_cache,
+)
 
 
 def test_app_config_is_registered() -> None:
@@ -28,6 +37,32 @@ def test_default_calendar_service_uses_settings(settings) -> None:
     calendar = get_default_calendar()
     assert isinstance(calendar, WorkingCalendar)
     assert calendar.tz.key == "UTC"
+
+
+def test_named_calendar_registry_service_uses_settings(settings) -> None:
+    settings.BIZCAL_DEFAULT_TIMEZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"0": [["09:00", "18:00"]]},
+        },
+        "operations": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"1": [["10:00", "16:00"]]},
+        },
+    }
+    reset_calendar_cache()
+
+    support = get_calendar("support")
+    operations = get_calendar("operations")
+
+    assert isinstance(support, WorkingCalendar)
+    assert isinstance(operations, WorkingCalendar)
+    assert support is get_calendar("support")
+    assert list_configured_calendars() == ("support", "operations")
 
 
 def test_build_calendar_uses_django_defaults(settings) -> None:
@@ -69,3 +104,18 @@ def test_default_calendar_can_be_used_for_arithmetic(settings) -> None:
         0,
         tzinfo=ZoneInfo("UTC"),
     )
+
+
+def test_named_calendar_lookup_raises_for_unknown_names(settings) -> None:
+    settings.BIZCAL_DEFAULT_TIMEZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"0": [["09:00", "18:00"]]},
+        }
+    }
+    reset_calendar_cache()
+    with pytest.raises(CalendarConfigurationError):
+        get_calendar("missing")

@@ -116,6 +116,67 @@ calendar = get_default_calendar()
 deadline = calendar.add_business_hours(ticket.created_at, 8)
 ```
 
+For projects with more than one operational calendar, define a named registry:
+
+```python
+BIZCAL_DEFAULT_TIMEZONE = "UTC"
+BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+BIZCAL_CALENDARS = {
+    "support": {
+        "type": "working",
+        "tz": "UTC",
+        "weekly_schedule": {
+            "0": [["09:00", "18:00"]],
+            "1": [["09:00", "18:00"]],
+            "2": [["09:00", "18:00"]],
+            "3": [["09:00", "18:00"]],
+            "4": [["09:00", "18:00"]],
+        },
+    },
+    "operations_latam": {
+        "type": "union",
+        "tz": "UTC",
+        "children": [
+            {
+                "type": "working",
+                "country": "CL",
+                "years": [2026, 2027],
+                "tz": "America/Santiago",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+            {
+                "type": "working",
+                "country": "MX",
+                "years": [2026, 2027],
+                "tz": "America/Mexico_City",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+        ],
+    },
+}
+```
+
+Use named calendars from application code:
+
+```python
+from django_bizcal.services import get_calendar, get_default_calendar
+
+support = get_default_calendar()
+regional_ops = get_calendar("operations_latam")
+```
+
 ## Calendar builder
 
 ```python
