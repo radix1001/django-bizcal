@@ -1,5 +1,10 @@
 # django-bizcal
 
+[![PyPI version](https://img.shields.io/pypi/v/django-bizcal.svg)](https://pypi.org/project/django-bizcal/)
+[![Python versions](https://img.shields.io/pypi/pyversions/django-bizcal.svg)](https://pypi.org/project/django-bizcal/)
+[![CI](https://github.com/radix1001/django-bizcal/actions/workflows/ci.yml/badge.svg)](https://github.com/radix1001/django-bizcal/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/radix1001/django-bizcal/blob/main/LICENSE)
+
 `django-bizcal` is a production-oriented Python library for Django projects that need composable business calendars with official holidays, custom holidays, intraday schedules, timezone-aware arithmetic, and reusable service integration.
 
 It is designed for SLA clocks, operational workflows, due dates, approvals, support desks, tenant-specific calendars, and country-specific business hours.
@@ -187,3 +192,6 @@ pytest
 
 Publishing guidance is documented in [`docs/release.md`](docs/release.md).
 
+## Support
+
+If `django-bizcal` helps your team, consider sponsoring ongoing maintenance, documentation, and new features through GitHub Sponsors or by reaching out for support and implementation work.

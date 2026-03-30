@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement or new capability for django-bizcal
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea. Please focus on the user problem and expected API or behavior.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What user need or product gap does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired API, configuration, or behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe workarounds or competing approaches if relevant.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Real usage examples such as SLA clocks, tenant calendars, or approvals.
+

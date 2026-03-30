@@ -4,8 +4,8 @@ __pycache__/
 .ruff_cache/
 build/
 dist/
+dist-pypi*/
 *.egg-info/
 *.pyc
 .DS_Store
 .venv/
-

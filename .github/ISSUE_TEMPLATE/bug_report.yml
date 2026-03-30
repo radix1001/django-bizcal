@@ -1,0 +1,46 @@
+name: Bug report
+description: Report a reproducible defect in django-bizcal
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve django-bizcal. Please provide a minimal, reproducible report.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include a minimal code sample, settings, or calendar definition that reproduces the issue.
+      placeholder: |
+        from django_bizcal import WorkingCalendar
+        ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python, Django, django-bizcal, OS, and timezone details.
+      placeholder: |
+        Python:
+        Django:
+        django-bizcal:
+        OS:
+        Timezone:
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Logs, traceback, screenshots, or related details.
+

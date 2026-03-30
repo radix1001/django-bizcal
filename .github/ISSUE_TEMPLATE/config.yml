@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and usage discussions
+    url: https://github.com/radix1001/django-bizcal/discussions
+    about: Ask usage questions, share ideas, or discuss roadmap topics.
+

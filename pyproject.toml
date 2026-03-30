@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-bizcal"
-version = "0.1.0"
+version = "0.1.1"
 description = "Composable business calendars for Django with holidays, intraday schedules, and timezone-aware operations."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -33,6 +33,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
   "Topic :: Office/Business :: Scheduling",
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -52,11 +53,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lfuentesl/django-bizcal"
-Documentation = "https://github.com/lfuentesl/django-bizcal/tree/main/docs"
-Repository = "https://github.com/lfuentesl/django-bizcal"
-Issues = "https://github.com/lfuentesl/django-bizcal/issues"
-Changelog = "https://github.com/lfuentesl/django-bizcal/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/radix1001/django-bizcal"
+Documentation = "https://github.com/radix1001/django-bizcal/tree/main/docs"
+Repository = "https://github.com/radix1001/django-bizcal"
+Issues = "https://github.com/radix1001/django-bizcal/issues"
+Changelog = "https://github.com/radix1001/django-bizcal/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/django_bizcal"]
