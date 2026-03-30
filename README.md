@@ -190,7 +190,7 @@ python -m build
 pytest
 ```
 
-Publishing guidance is documented in [`docs/release.md`](docs/release.md).
+The recommended release path uses GitHub Actions plus PyPI Trusted Publishing. Publishing guidance is documented in [`docs/release.md`](docs/release.md).
 
 ## Support
 

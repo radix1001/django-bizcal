@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- Hardened the GitHub release workflow for Trusted Publishing.
+- Documented the recommended PyPI Trusted Publishing setup and fallback flow.
+- Updated release guidance in the README.
+
 ## 0.1.1
 
 - Marked the package as typed with `py.typed`.
