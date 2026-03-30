@@ -1,0 +1,189 @@
+# django-bizcal
+
+`django-bizcal` is a production-oriented Python library for Django projects that need composable business calendars with official holidays, custom holidays, intraday schedules, timezone-aware arithmetic, and reusable service integration.
+
+It is designed for SLA clocks, operational workflows, due dates, approvals, support desks, tenant-specific calendars, and country-specific business hours.
+
+## Highlights
+
+- Pure domain core with no ORM coupling.
+- Official holidays via [`holidays`](https://pypi.org/project/holidays/).
+- Custom organization or tenant holidays in memory.
+- Intraday schedules with multiple windows per weekday.
+- Calendar composition with union, intersection, difference, and override.
+- Explicit timezone support based on `zoneinfo`.
+- Reusable Django app with namespaced settings and service helpers.
+- Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
+
+## Installation
+
+```bash
+pip install django-bizcal
+```
+
+For local development:
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Quickstart
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from django_bizcal import UnionCalendar, WorkingCalendar
+
+cl = WorkingCalendar.from_country(
+    country="CL",
+    years=[2026, 2027],
+    tz="America/Santiago",
+    weekly_schedule={
+        0: [("09:00", "13:00"), ("14:00", "18:00")],
+        1: [("09:00", "13:00"), ("14:00", "18:00")],
+        2: [("09:00", "13:00"), ("14:00", "18:00")],
+        3: [("09:00", "13:00"), ("14:00", "18:00")],
+        4: [("09:00", "13:00"), ("14:00", "17:00")],
+    },
+    extra_holidays=["2026-12-24", "2026-12-31"],
+)
+
+mx = WorkingCalendar.from_country(
+    country="MX",
+    years=[2026, 2027],
+    tz="America/Mexico_City",
+    weekly_schedule={
+        0: [("09:00", "18:00")],
+        1: [("09:00", "18:00")],
+        2: [("09:00", "18:00")],
+        3: [("09:00", "18:00")],
+        4: [("09:00", "18:00")],
+    },
+)
+
+regional = UnionCalendar([cl, mx], tz="UTC")
+
+start = datetime(2026, 1, 5, 15, 0, tzinfo=ZoneInfo("UTC"))
+deadline = regional.add_business_hours(start, 10)
+elapsed = regional.business_minutes_between(start, deadline)
+```
+
+## Django integration
+
+Add the reusable app:
+
+```python
+INSTALLED_APPS = [
+    ...,
+    "django_bizcal",
+]
+```
+
+Configure a default calendar:
+
+```python
+BIZCAL_DEFAULT_TIMEZONE = "America/Santiago"
+BIZCAL_DEFAULT_COUNTRY = "CL"
+BIZCAL_PRELOAD_YEARS = [2026, 2027]
+BIZCAL_DEFAULT_CALENDAR = {
+    "type": "working",
+    "tz": "America/Santiago",
+    "country": "CL",
+    "years": [2026, 2027],
+    "weekly_schedule": {
+        "0": [["09:00", "13:00"], ["14:00", "18:00"]],
+        "1": [["09:00", "13:00"], ["14:00", "18:00"]],
+        "2": [["09:00", "13:00"], ["14:00", "18:00"]],
+        "3": [["09:00", "13:00"], ["14:00", "18:00"]],
+        "4": [["09:00", "13:00"], ["14:00", "17:00"]],
+    },
+    "extra_holidays": ["2026-12-24", "2026-12-31"],
+}
+```
+
+Consume it from application code:
+
+```python
+from django_bizcal.services import get_default_calendar
+
+calendar = get_default_calendar()
+deadline = calendar.add_business_hours(ticket.created_at, 8)
+```
+
+## Calendar builder
+
+```python
+from django_bizcal import CalendarBuilder
+
+calendar = CalendarBuilder.from_dict(
+    {
+        "type": "union",
+        "tz": "UTC",
+        "children": [
+            {
+                "type": "working",
+                "country": "CL",
+                "years": [2026, 2027],
+                "tz": "America/Santiago",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+            {
+                "type": "working",
+                "country": "MX",
+                "years": [2026, 2027],
+                "tz": "America/Mexico_City",
+                "weekly_schedule": {
+                    "0": [["09:00", "18:00"]],
+                    "1": [["09:00", "18:00"]],
+                    "2": [["09:00", "18:00"]],
+                    "3": [["09:00", "18:00"]],
+                    "4": [["09:00", "18:00"]],
+                },
+            },
+        ],
+    }
+)
+```
+
+## Architecture
+
+- The domain core lives in `src/django_bizcal` and stays framework-light.
+- `WorkingCalendar` handles business schedules and holiday lookup.
+- Composition calendars project child windows into a reference timezone.
+- The Django layer only wraps settings, AppConfig, and service helpers.
+- V1 intentionally ships without database models to keep the public core stable and reusable.
+
+See the full documentation in:
+
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/api.md`](docs/api.md)
+- [`docs/django-integration.md`](docs/django-integration.md)
+- [`docs/release.md`](docs/release.md)
+
+## Compatibility
+
+- Python 3.11+
+- Django 4.2, 5.0, 5.1
+
+## Limitations
+
+- Official holiday lookup requires the relevant years to be preloaded.
+- Wall-clock times are interpreted with `zoneinfo`; DST transitions affect real elapsed durations.
+- V1 does not persist calendar definitions in the database.
+
+## Release
+
+```bash
+python -m build
+pytest
+```
+
+Publishing guidance is documented in [`docs/release.md`](docs/release.md).
+

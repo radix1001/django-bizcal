@@ -1,0 +1,114 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-bizcal"
+version = "0.1.0"
+description = "Composable business calendars for Django with holidays, intraday schedules, and timezone-aware operations."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+authors = [
+  { name = "Luis Fuentes" },
+]
+keywords = [
+  "django",
+  "business-calendar",
+  "holidays",
+  "sla",
+  "timezone",
+  "workflows",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: Django",
+  "Framework :: Django :: 4.2",
+  "Framework :: Django :: 5.0",
+  "Framework :: Django :: 5.1",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Scheduling",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "Django>=4.2,<5.2",
+  "holidays>=0.58,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.2",
+  "mypy>=1.11.0",
+  "pytest>=8.3.0",
+  "pytest-django>=4.9.0",
+  "ruff>=0.6.0",
+  "twine>=5.1.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/lfuentesl/django-bizcal"
+Documentation = "https://github.com/lfuentesl/django-bizcal/tree/main/docs"
+Repository = "https://github.com/lfuentesl/django-bizcal"
+Issues = "https://github.com/lfuentesl/django-bizcal/issues"
+Changelog = "https://github.com/lfuentesl/django-bizcal/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/django_bizcal"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/tests",
+  "/docs",
+  "/examples",
+  "/README.md",
+  "/LICENSE",
+  "/CHANGELOG.md",
+  "/pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.django_test_project.settings"
+pythonpath = [
+  ".",
+  "src",
+]
+testpaths = [
+  "tests",
+]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "examples"]
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+  "UP",
+  "N",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["django_bizcal"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["django_bizcal"]
+strict = true
+warn_unused_configs = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["django.*"]
+ignore_missing_imports = true
