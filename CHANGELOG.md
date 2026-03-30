@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Added a more ergonomic calendar API with business-day iteration, counting, opening and closing helpers, and typed declarative config exports.
+- Added `CalendarBuilder.to_dict(...)` for normalized round-trip serialization of working and composite calendars.
+- Added named calendar registry support for Django via `BIZCAL_CALENDARS`, `BIZCAL_DEFAULT_CALENDAR_NAME`, `get_calendar(...)`, and cached multi-calendar service resolution.
+- Added optional Django persistence for full-day holiday closures with the `CalendarHoliday` model, `DatabaseHolidayProvider`, admin registration, and automatic application to named calendars when `BIZCAL_ENABLE_DB_MODELS=True`.
+- Added Django service helpers for managing persisted holidays, including `set_calendar_holiday(...)`, `sync_calendar_holidays(...)`, activation, deactivation, deletion, and cache invalidation.
+- Expanded the test suite to cover edge cases, API ergonomics, multi-calendar Django integration, and database-backed holiday persistence.
+
 ## 0.1.2
 
 - Hardened the GitHub release workflow for Trusted Publishing.

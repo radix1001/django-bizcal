@@ -83,7 +83,7 @@ Official reference:
 
 1. Update version and changelog
 2. Push changes to `main`
-3. Create and push a tag like `v0.1.1`
+3. Create and push a tag like `v0.2.0`
 4. Create a GitHub Release for that tag
 5. The `Publish` workflow builds, validates, and uploads the distributions to PyPI
 
