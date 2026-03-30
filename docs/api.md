@@ -148,3 +148,23 @@ Public configuration typing is also exported:
 - `IntersectionCalendarConfig`
 - `DifferenceCalendarConfig`
 - `OverrideCalendarConfig`
+
+## Django-specific API
+
+The root package intentionally stays framework-light.
+For Django-only persistence and service helpers, use `django_bizcal.django_api`.
+
+Stable Django-specific exports include:
+
+- `CalendarHoliday`
+- `DatabaseHolidayProvider`
+- `get_default_calendar()`
+- `get_calendar(name)`
+- `list_configured_calendars()`
+- `list_calendar_holidays(...)`
+- `get_calendar_holiday(...)`
+- `set_calendar_holiday(...)`
+- `activate_calendar_holiday(...)`
+- `deactivate_calendar_holiday(...)`
+- `delete_calendar_holiday(...)`
+- `sync_calendar_holidays(...)`

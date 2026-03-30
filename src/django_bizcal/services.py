@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from functools import cache
+from threading import RLock
 from typing import Any, TypeAlias
 
 from django.db import transaction
@@ -18,12 +18,21 @@ from .types import DateInput, coerce_date
 
 CalendarHolidayRow: TypeAlias = Any
 
+_CALENDAR_CACHE: dict[str, BusinessCalendar] = {}
+_CALENDAR_CACHE_LOCK = RLock()
 
-@cache
+
 def get_calendar(name: str) -> BusinessCalendar:
     """Return a configured named calendar resolved from Django settings."""
+    normalized_name = _normalize_calendar_name(name)
+    with _CALENDAR_CACHE_LOCK:
+        cached = _CALENDAR_CACHE.get(normalized_name)
+        if cached is not None:
+            return cached
     current_settings = get_bizcal_settings()
-    return current_settings.build_calendar(name)
+    calendar = current_settings.build_calendar(normalized_name)
+    with _CALENDAR_CACHE_LOCK:
+        return _CALENDAR_CACHE.setdefault(normalized_name, calendar)
 
 
 def get_default_calendar() -> BusinessCalendar:
@@ -98,7 +107,7 @@ def set_calendar_holiday(
     is_active: bool = True,
     using: str = "default",
 ) -> CalendarHolidayRow:
-    """Create or update a persisted holiday row and clear cached calendars."""
+    """Create or update a persisted holiday row and clear the relevant cached calendar."""
     from .models import CalendarHoliday
 
     normalized_name = _normalize_calendar_name(calendar_name)
@@ -111,7 +120,7 @@ def set_calendar_holiday(
             "is_active": is_active,
         },
     )
-    reset_calendar_cache()
+    reset_calendar_cache(normalized_name)
     return holiday
 
 
@@ -145,14 +154,15 @@ def deactivate_calendar_holiday(
     *,
     using: str = "default",
 ) -> CalendarHolidayRow | None:
-    """Mark a persisted holiday as inactive and clear cached calendars."""
-    holiday = get_calendar_holiday(calendar_name, day, include_inactive=True, using=using)
+    """Mark a persisted holiday as inactive and clear the relevant cached calendar."""
+    normalized_name = _normalize_calendar_name(calendar_name)
+    holiday = get_calendar_holiday(normalized_name, day, include_inactive=True, using=using)
     if holiday is None:
         return None
     if holiday.is_active:
         holiday.is_active = False
         holiday.save(update_fields=["is_active", "updated_at"])
-        reset_calendar_cache()
+        reset_calendar_cache(normalized_name)
     return holiday
 
 
@@ -162,12 +172,13 @@ def delete_calendar_holiday(
     *,
     using: str = "default",
 ) -> bool:
-    """Delete a persisted holiday row and clear cached calendars when it existed."""
-    holiday = get_calendar_holiday(calendar_name, day, include_inactive=True, using=using)
+    """Delete a persisted holiday row and clear the relevant cached calendar."""
+    normalized_name = _normalize_calendar_name(calendar_name)
+    holiday = get_calendar_holiday(normalized_name, day, include_inactive=True, using=using)
     if holiday is None:
         return False
     holiday.delete(using=using)
-    reset_calendar_cache()
+    reset_calendar_cache(normalized_name)
     return True
 
 
@@ -208,13 +219,17 @@ def sync_calendar_holidays(
                 holiday.is_active = False
                 holiday.save(update_fields=["is_active", "updated_at"])
 
-    reset_calendar_cache()
+    reset_calendar_cache(normalized_name)
     return tuple(saved)
 
 
-def reset_calendar_cache() -> None:
-    """Clear service-level calendar caches for tests or runtime reloads."""
-    get_calendar.cache_clear()
+def reset_calendar_cache(name: str | None = None) -> None:
+    """Clear all cached calendars or just the one matching the given logical name."""
+    with _CALENDAR_CACHE_LOCK:
+        if name is None:
+            _CALENDAR_CACHE.clear()
+            return
+        _CALENDAR_CACHE.pop(_normalize_calendar_name(name), None)
 
 
 def _normalize_calendar_name(value: str) -> str:

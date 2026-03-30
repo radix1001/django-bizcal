@@ -3,10 +3,14 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
-from django.db import IntegrityError
+from django.contrib import admin
+from django.db import IntegrityError, connection
+from django.db.migrations.executor import MigrationExecutor
 
+from django_bizcal.admin import CalendarHolidayAdmin
 from django_bizcal.calendars.working import WorkingCalendar
 from django_bizcal.db import DatabaseHolidayProvider, apply_database_holiday_overrides
+from django_bizcal.django_api import CalendarHoliday as CalendarHolidayFromApi
 from django_bizcal.exceptions import ValidationError
 from django_bizcal.models import CalendarHoliday
 from django_bizcal.services import (
@@ -36,6 +40,17 @@ def test_calendar_holiday_model_enforces_uniqueness() -> None:
             day=date(2026, 12, 24),
             name="Duplicate",
         )
+
+
+def test_django_persistence_public_surface_and_admin_registration() -> None:
+    assert CalendarHolidayFromApi is CalendarHoliday
+    assert isinstance(admin.site._registry[CalendarHoliday], CalendarHolidayAdmin)
+
+
+def test_django_persistence_migration_is_registered() -> None:
+    executor = MigrationExecutor(connection)
+    assert ("django_bizcal", "0001_initial") in executor.loader.graph.leaf_nodes()
+    assert "django_bizcal_calendarholiday" in connection.introspection.table_names()
 
 
 def test_database_holiday_provider_reads_active_rows_only() -> None:
@@ -138,6 +153,35 @@ def test_calendar_holiday_helpers_clear_cached_named_calendars(settings) -> None
     delete_calendar_holiday("support", "2026-12-24")
 
     assert get_calendar("support").is_business_day(date(2026, 12, 24)) is True
+
+
+def test_selective_cache_invalidation_keeps_other_named_calendars_hot(settings) -> None:
+    settings.BIZCAL_ENABLE_DB_MODELS = True
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"3": [["09:00", "18:00"]]},
+        },
+        "operations": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"3": [["08:00", "12:00"]]},
+        },
+    }
+    reset_calendar_cache()
+
+    support_before = get_calendar("support")
+    operations_before = get_calendar("operations")
+
+    set_calendar_holiday("support", "2026-12-24", name="Shutdown")
+
+    support_after = get_calendar("support")
+    operations_after = get_calendar("operations")
+
+    assert support_after is not support_before
+    assert operations_after is operations_before
 
 
 def test_database_holidays_are_auto_applied_to_named_working_calendars(settings) -> None:

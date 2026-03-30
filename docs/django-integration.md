@@ -133,6 +133,14 @@ Rules:
 
 ## Services
 
+Import recommendation:
+
+```python
+from django_bizcal.django_api import get_calendar, set_calendar_holiday
+```
+
+The `django_api` module is the stable Django-specific import surface for services, persistence helpers, and the optional model/provider layer.
+
 ### `get_default_calendar()`
 
 Builds and caches the default calendar from Django settings.
@@ -201,6 +209,12 @@ The Django service layer also exposes convenience helpers that invalidate the ca
 - `sync_calendar_holidays(calendar_name, days)`
 
 These helpers are the recommended way to manage `CalendarHoliday` rows from application code because they keep `get_calendar(name)` and `get_default_calendar()` coherent without requiring a manual `reset_calendar_cache()`.
+
+Cache behavior:
+
+- `reset_calendar_cache()` clears all named calendar instances
+- `reset_calendar_cache(name)` clears only one named calendar
+- holiday mutation helpers invalidate only the affected logical calendar
 
 ### `list_configured_calendars()`
 

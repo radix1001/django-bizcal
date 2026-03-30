@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Added a stable Django-specific public surface in `django_bizcal.django_api` for persistence and service helpers.
+- Added selective named-calendar cache invalidation so persisted holiday changes only evict the affected logical calendar.
+- Added admin and migration smoke coverage for the optional Django persistence layer.
+- Expanded Django integration documentation with recommended import paths and cache behavior guidance.
+
 ## 0.2.0
 
 - Added a more ergonomic calendar API with business-day iteration, counting, opening and closing helpers, and typed declarative config exports.

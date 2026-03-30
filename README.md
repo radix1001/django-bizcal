@@ -200,6 +200,12 @@ set_calendar_holiday("support", date(2026, 12, 31), name="Year end close")
 Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically apply full-day closures from `CalendarHoliday` rows that match the logical calendar name.
 The service helpers also clear the cached named calendars automatically after each change.
 
+Preferred Django-specific imports:
+
+```python
+from django_bizcal.django_api import get_calendar, set_calendar_holiday
+```
+
 ## Calendar builder
 
 ```python
