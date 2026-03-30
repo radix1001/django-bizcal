@@ -96,12 +96,17 @@ class BizcalSettings:
 
     def build_calendar(self, name: str) -> BusinessCalendar:
         """Build a configured named calendar using Django defaults as fallback context."""
-        return CalendarBuilder.from_dict(
+        calendar = CalendarBuilder.from_dict(
             self.get_calendar_config(name),
             default_tz=self.default_timezone.key,
             default_country=self.default_country,
             preload_years=self.preload_years,
         )
+        if not self.enable_db_models:
+            return calendar
+        from .db import apply_database_holiday_overrides
+
+        return apply_database_holiday_overrides(calendar, calendar_name=name)
 
     def get_calendar_config(self, name: str) -> CalendarConfig:
         """Return a configured calendar definition by logical name."""

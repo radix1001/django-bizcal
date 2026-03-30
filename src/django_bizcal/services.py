@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import cache
-from typing import Any
+from typing import Any, TypeAlias
 
+from django.db import transaction
 from django.utils import timezone as django_timezone
 
 from .builder import CalendarBuilder
 from .calendars.base import BusinessCalendar
 from .config import CalendarConfig
+from .exceptions import ValidationError
 from .settings import get_bizcal_settings
+from .types import DateInput, coerce_date
+
+CalendarHolidayRow: TypeAlias = Any
 
 
 @cache
@@ -43,10 +49,176 @@ def now() -> Any:
 
 
 def list_configured_calendars() -> tuple[str, ...]:
-    """Return configured logical calendar names from Django settings."""
+    """Return configured logical calendar names from settings."""
     return tuple(get_bizcal_settings().calendar_configs)
+
+
+def list_calendar_holidays(
+    calendar_name: str,
+    *,
+    include_inactive: bool = False,
+    using: str = "default",
+) -> tuple[CalendarHolidayRow, ...]:
+    """Return persisted holiday rows for a logical calendar name."""
+    from .models import CalendarHoliday
+
+    normalized_name = _normalize_calendar_name(calendar_name)
+    queryset = CalendarHoliday.objects.using(using).filter(calendar_name=normalized_name)
+    if not include_inactive:
+        queryset = queryset.filter(is_active=True)
+    return tuple(queryset.order_by("day"))
+
+
+def get_calendar_holiday(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    include_inactive: bool = False,
+    using: str = "default",
+) -> CalendarHolidayRow | None:
+    """Return a persisted holiday row for a logical calendar name and day."""
+    from .models import CalendarHoliday
+
+    normalized_name = _normalize_calendar_name(calendar_name)
+    normalized_day = coerce_date(day)
+    queryset = CalendarHoliday.objects.using(using).filter(
+        calendar_name=normalized_name,
+        day=normalized_day,
+    )
+    if not include_inactive:
+        queryset = queryset.filter(is_active=True)
+    return queryset.first()
+
+
+def set_calendar_holiday(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    name: str = "",
+    is_active: bool = True,
+    using: str = "default",
+) -> CalendarHolidayRow:
+    """Create or update a persisted holiday row and clear cached calendars."""
+    from .models import CalendarHoliday
+
+    normalized_name = _normalize_calendar_name(calendar_name)
+    normalized_day = coerce_date(day)
+    holiday, _ = CalendarHoliday.objects.using(using).update_or_create(
+        calendar_name=normalized_name,
+        day=normalized_day,
+        defaults={
+            "name": name,
+            "is_active": is_active,
+        },
+    )
+    reset_calendar_cache()
+    return holiday
+
+
+def activate_calendar_holiday(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    name: str | None = None,
+    using: str = "default",
+) -> CalendarHolidayRow:
+    """Mark a holiday as active, creating it when necessary."""
+    existing = get_calendar_holiday(
+        calendar_name,
+        day,
+        include_inactive=True,
+        using=using,
+    )
+    resolved_name = existing.name if existing is not None and name is None else (name or "")
+    return set_calendar_holiday(
+        calendar_name,
+        day,
+        name=resolved_name,
+        is_active=True,
+        using=using,
+    )
+
+
+def deactivate_calendar_holiday(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    using: str = "default",
+) -> CalendarHolidayRow | None:
+    """Mark a persisted holiday as inactive and clear cached calendars."""
+    holiday = get_calendar_holiday(calendar_name, day, include_inactive=True, using=using)
+    if holiday is None:
+        return None
+    if holiday.is_active:
+        holiday.is_active = False
+        holiday.save(update_fields=["is_active", "updated_at"])
+        reset_calendar_cache()
+    return holiday
+
+
+def delete_calendar_holiday(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    using: str = "default",
+) -> bool:
+    """Delete a persisted holiday row and clear cached calendars when it existed."""
+    holiday = get_calendar_holiday(calendar_name, day, include_inactive=True, using=using)
+    if holiday is None:
+        return False
+    holiday.delete(using=using)
+    reset_calendar_cache()
+    return True
+
+
+def sync_calendar_holidays(
+    calendar_name: str,
+    days: Iterable[DateInput],
+    *,
+    using: str = "default",
+) -> tuple[CalendarHolidayRow, ...]:
+    """Make the active holiday set exactly match the provided days."""
+    from .models import CalendarHoliday
+
+    normalized_name = _normalize_calendar_name(calendar_name)
+    normalized_days = tuple(sorted({coerce_date(day) for day in days}))
+    holidays_by_day = {
+        holiday.day: holiday
+        for holiday in CalendarHoliday.objects.using(using).filter(calendar_name=normalized_name)
+    }
+    active_days = set(normalized_days)
+    saved: list[CalendarHolidayRow] = []
+
+    with transaction.atomic(using=using):
+        for current_day in normalized_days:
+            holiday = holidays_by_day.get(current_day)
+            if holiday is None:
+                holiday = CalendarHoliday.objects.using(using).create(
+                    calendar_name=normalized_name,
+                    day=current_day,
+                    is_active=True,
+                )
+            elif not holiday.is_active:
+                holiday.is_active = True
+                holiday.save(update_fields=["is_active", "updated_at"])
+            saved.append(holiday)
+
+        for stale_day, holiday in holidays_by_day.items():
+            if stale_day not in active_days and holiday.is_active:
+                holiday.is_active = False
+                holiday.save(update_fields=["is_active", "updated_at"])
+
+    reset_calendar_cache()
+    return tuple(saved)
 
 
 def reset_calendar_cache() -> None:
     """Clear service-level calendar caches for tests or runtime reloads."""
     get_calendar.cache_clear()
+
+
+def _normalize_calendar_name(value: str) -> str:
+    name = str(value).strip()
+    if not name:
+        raise ValidationError("calendar_name must not be blank.")
+    return name

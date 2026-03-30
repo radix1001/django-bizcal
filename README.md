@@ -18,6 +18,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
 - Reusable Django app with namespaced settings and service helpers.
+- Optional database-backed holiday closures for named Django calendars.
 - Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
 
 ## Installation
@@ -176,6 +177,28 @@ from django_bizcal.services import get_calendar, get_default_calendar
 support = get_default_calendar()
 regional_ops = get_calendar("operations_latam")
 ```
+
+Persisted holiday closures can be enabled for named Django calendars:
+
+```python
+BIZCAL_ENABLE_DB_MODELS = True
+
+from datetime import date
+
+from django_bizcal.models import CalendarHoliday
+from django_bizcal.services import set_calendar_holiday
+
+CalendarHoliday.objects.create(
+    calendar_name="support",
+    day=date(2026, 12, 24),
+    name="Company shutdown",
+)
+
+set_calendar_holiday("support", date(2026, 12, 31), name="Year end close")
+```
+
+Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically apply full-day closures from `CalendarHoliday` rows that match the logical calendar name.
+The service helpers also clear the cached named calendars automatically after each change.
 
 ## Calendar builder
 

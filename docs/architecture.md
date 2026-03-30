@@ -46,6 +46,10 @@ Included in v1:
 - `SetHolidayProvider` for custom in-memory dates
 - `CompositeHolidayProvider` to combine both
 
+Included in the Django layer:
+
+- `DatabaseHolidayProvider` for persisted holiday dates via Django ORM
+
 This keeps future database-backed providers additive rather than invasive.
 
 ### Django integration
@@ -55,27 +59,31 @@ Modules:
 - `apps.py`
 - `settings.py`
 - `services.py`
+- `models.py`
+- `db.py`
 
 Responsibilities:
 
 - Expose a reusable `AppConfig`
 - Resolve namespaced settings
 - Build and cache the default calendar
+- Resolve named calendars and optionally apply persisted holiday closures
 - Provide helpers that fit typical Django service usage
 
 No domain logic depends on ORM models, request objects, middleware, or settings globals.
 
-## Why v1 has no models
+## Why persistence stays minimal
 
-The hardest part of this product is correct business-time behavior across holidays, schedules, composition, and timezones. Shipping models in v1 would force an early schema and serialization contract before the core API settles.
+The hardest part of this product is correct business-time behavior across holidays, schedules, composition, and timezones. Full calendar-definition persistence would force an early schema and serialization contract before the core API settles.
 
 The chosen strategy is:
 
 - Stabilize the pure domain first.
 - Make calendars declarative through `CalendarBuilder.from_dict(...)`.
-- Keep database persistence as a future extension via a dedicated provider or app-level models.
+- Add only the smallest persistence unit with immediate value: persisted holiday closures keyed by logical calendar name.
+- Keep weekly schedules and composition declarative rather than ORM-managed for now.
 
-This keeps the library lighter, easier to test, and easier to embed into other Django codebases.
+This keeps the library lighter, easier to test, and easier to embed into other Django codebases while still unlocking tenant- or client-specific closed dates.
 
 ## Timezone strategy
 
@@ -130,4 +138,3 @@ Stable v1 public imports are exposed from `django_bizcal`:
 - `HolidayProvider`
 
 Supporting modules remain importable, but only this root-level surface is considered the stable API contract.
-

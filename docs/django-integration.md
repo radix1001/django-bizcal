@@ -11,7 +11,8 @@ INSTALLED_APPS = [
 ]
 ```
 
-The app does not ship models in v1, so adding it is lightweight.
+The app remains lightweight.
+Its persistence layer is intentionally small: one optional model for full-day holiday closures, not full calendar-definition storage.
 
 ## Settings
 
@@ -44,7 +45,19 @@ If set to `3`, the integration resolves it to current year minus one through cur
 
 ### `BIZCAL_ENABLE_DB_MODELS`
 
-Reserved for future optional persistence support. It is exposed now so projects can keep a stable settings namespace.
+Enables optional database-backed holiday closures for named Django calendars.
+
+When enabled:
+
+- `get_default_calendar()` applies persisted closures for `BIZCAL_DEFAULT_CALENDAR_NAME`
+- `get_calendar(name)` applies persisted closures for that logical name
+- persisted closures are implemented as full-day overrides on top of the configured calendar
+
+Current scope:
+
+- backed by the `CalendarHoliday` model
+- applies to named calendars resolved through the Django service layer
+- intended for organization, tenant, client, or team-specific closed dates
 
 ### `BIZCAL_DEFAULT_CALENDAR`
 
@@ -146,6 +159,49 @@ calendar = get_calendar("operations_latam")
 deadline = calendar.add_business_hours(start_dt, 6)
 ```
 
+### `CalendarHoliday`
+
+Optional Django model for persisted full-day closures keyed by logical calendar name.
+
+```python
+from datetime import date
+
+from django_bizcal.models import CalendarHoliday
+from django_bizcal.services import set_calendar_holiday, sync_calendar_holidays
+
+CalendarHoliday.objects.create(
+    calendar_name="support",
+    day=date(2026, 12, 24),
+    name="Company shutdown",
+)
+
+set_calendar_holiday("support", date(2026, 12, 31), name="Year end close")
+sync_calendar_holidays("support", [date(2026, 12, 24), date(2026, 12, 31)])
+```
+
+Fields:
+
+- `calendar_name`
+- `day`
+- `name`
+- `is_active`
+
+The uniqueness constraint is `(calendar_name, day)`.
+
+### Calendar holiday helpers
+
+The Django service layer also exposes convenience helpers that invalidate the cached named calendars automatically after each mutation:
+
+- `list_calendar_holidays(calendar_name, include_inactive=False)`
+- `get_calendar_holiday(calendar_name, day, include_inactive=False)`
+- `set_calendar_holiday(calendar_name, day, name="", is_active=True)`
+- `activate_calendar_holiday(calendar_name, day, name=None)`
+- `deactivate_calendar_holiday(calendar_name, day)`
+- `delete_calendar_holiday(calendar_name, day)`
+- `sync_calendar_holidays(calendar_name, days)`
+
+These helpers are the recommended way to manage `CalendarHoliday` rows from application code because they keep `get_calendar(name)` and `get_default_calendar()` coherent without requiring a manual `reset_calendar_cache()`.
+
 ### `list_configured_calendars()`
 
 Return the configured logical calendar names from settings.
@@ -158,4 +214,5 @@ Useful in tests or reload scenarios after changing settings.
 
 - Keep calendar construction in a service layer.
 - Reuse singleton-like calendars through `get_default_calendar()` and `get_calendar(name)`.
+- Use `CalendarHoliday` for tenant or organization closed dates without recompiling calendar configs.
 - Pass aware datetimes from Django models or `django.utils.timezone.now()`.
