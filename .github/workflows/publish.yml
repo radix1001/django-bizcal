@@ -13,9 +13,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  publish-pypi:
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
+      id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v6
@@ -28,23 +31,5 @@ jobs:
           python -m pip install -e ".[dev]"
           python -m build
           python -m twine check dist/*
-      - uses: actions/upload-artifact@v6
-        with:
-          name: dist
-          path: dist/
-
-  publish-pypi:
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-    needs: build
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/download-artifact@v6
-        with:
-          name: dist
-          path: dist/
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
