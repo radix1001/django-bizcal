@@ -19,6 +19,7 @@ from django_bizcal.services import (
     delete_calendar_holiday,
     get_calendar,
     get_calendar_holiday,
+    list_calendar_holiday_days,
     list_calendar_holidays,
     reset_calendar_cache,
     set_calendar_holiday,
@@ -92,6 +93,7 @@ def test_calendar_holiday_service_helpers_support_crud_and_listing() -> None:
 
     assert created.name == "Shutdown"
     assert [holiday.day for holiday in listed] == [date(2026, 12, 24)]
+    assert list_calendar_holiday_days("support") == (date(2026, 12, 24),)
     assert get_calendar_holiday("support", "2026-12-24") is not None
     assert delete_calendar_holiday("support", "2026-12-24") is True
     assert get_calendar_holiday("support", "2026-12-24") is None

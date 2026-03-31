@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import date
 from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone as django_timezone
 
 from .builder import CalendarBuilder
@@ -85,6 +87,23 @@ def list_calendar_holidays(
     return tuple(queryset.order_by("day"))
 
 
+def list_calendar_holiday_days(
+    calendar_name: str,
+    *,
+    include_inactive: bool = False,
+    using: str = "default",
+) -> tuple[date, ...]:
+    """Return persisted holiday dates for a logical calendar name."""
+    return tuple(
+        holiday.day
+        for holiday in list_calendar_holidays(
+            calendar_name,
+            include_inactive=include_inactive,
+            using=using,
+        )
+    )
+
+
 def list_calendar_day_overrides(
     calendar_name: str,
     *,
@@ -92,17 +111,44 @@ def list_calendar_day_overrides(
     using: str = "default",
 ) -> tuple[CalendarDayOverrideRow, ...]:
     """Return persisted day override rows for a logical calendar name."""
-    from .models import CalendarDayOverride
+    from .models import CalendarDayOverride, CalendarDayOverrideWindow
 
     normalized_name = _normalize_calendar_name(calendar_name)
     queryset = (
         CalendarDayOverride.objects.using(using)
         .filter(calendar_name=normalized_name)
-        .prefetch_related("windows")
+        .prefetch_related(
+            Prefetch(
+                "windows",
+                queryset=CalendarDayOverrideWindow.objects.using(using).order_by(
+                    "position",
+                    "start_time",
+                    "end_time",
+                    "pk",
+                ),
+            )
+        )
     )
     if not include_inactive:
         queryset = queryset.filter(is_active=True)
     return tuple(queryset.order_by("day"))
+
+
+def list_calendar_day_override_windows(
+    calendar_name: str,
+    *,
+    include_inactive: bool = False,
+    using: str = "default",
+) -> dict[date, tuple[TimeWindow, ...]]:
+    """Return normalized persisted override windows keyed by day."""
+    return {
+        override.day: _override_windows(override)
+        for override in list_calendar_day_overrides(
+            calendar_name,
+            include_inactive=include_inactive,
+            using=using,
+        )
+    }
 
 
 def get_calendar_holiday(
@@ -134,18 +180,47 @@ def get_calendar_day_override(
     using: str = "default",
 ) -> CalendarDayOverrideRow | None:
     """Return a persisted day override row for a logical calendar name and day."""
-    from .models import CalendarDayOverride
+    from .models import CalendarDayOverride, CalendarDayOverrideWindow
 
     normalized_name = _normalize_calendar_name(calendar_name)
     normalized_day = coerce_date(day)
     queryset = (
         CalendarDayOverride.objects.using(using)
         .filter(calendar_name=normalized_name, day=normalized_day)
-        .prefetch_related("windows")
+        .prefetch_related(
+            Prefetch(
+                "windows",
+                queryset=CalendarDayOverrideWindow.objects.using(using).order_by(
+                    "position",
+                    "start_time",
+                    "end_time",
+                    "pk",
+                ),
+            )
+        )
     )
     if not include_inactive:
         queryset = queryset.filter(is_active=True)
     return cast(CalendarDayOverrideRow | None, queryset.first())
+
+
+def get_calendar_day_override_windows(
+    calendar_name: str,
+    day: DateInput,
+    *,
+    include_inactive: bool = False,
+    using: str = "default",
+) -> tuple[TimeWindow, ...] | None:
+    """Return normalized persisted override windows for one logical day."""
+    override = get_calendar_day_override(
+        calendar_name,
+        day,
+        include_inactive=include_inactive,
+        using=using,
+    )
+    if override is None:
+        return None
+    return _override_windows(override)
 
 
 def set_calendar_holiday(
@@ -388,7 +463,7 @@ def sync_calendar_day_overrides(
     using: str = "default",
 ) -> tuple[CalendarDayOverrideRow, ...]:
     """Make the active day-override set exactly match the provided mapping."""
-    from .models import CalendarDayOverride
+    from .models import CalendarDayOverride, CalendarDayOverrideWindow
 
     normalized_name = _normalize_calendar_name(calendar_name)
     normalized_overrides = {
@@ -399,7 +474,17 @@ def sync_calendar_day_overrides(
         override.day: override
         for override in CalendarDayOverride.objects.using(using)
         .filter(calendar_name=normalized_name)
-        .prefetch_related("windows")
+        .prefetch_related(
+            Prefetch(
+                "windows",
+                queryset=CalendarDayOverrideWindow.objects.using(using).order_by(
+                    "position",
+                    "start_time",
+                    "end_time",
+                    "pk",
+                ),
+            )
+        )
     }
     active_days = set(normalized_overrides)
     saved: list[CalendarDayOverrideRow] = []
@@ -452,3 +537,9 @@ def _normalize_calendar_name(value: str) -> str:
     if not name:
         raise ValidationError("calendar_name must not be blank.")
     return name
+
+
+def _override_windows(override: CalendarDayOverrideRow) -> tuple[TimeWindow, ...]:
+    return build_time_windows(
+        (window.start_time, window.end_time) for window in override.windows.all()
+    )

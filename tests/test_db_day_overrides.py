@@ -30,6 +30,8 @@ from django_bizcal.services import (
     delete_calendar_day_override,
     get_calendar,
     get_calendar_day_override,
+    get_calendar_day_override_windows,
+    list_calendar_day_override_windows,
     list_calendar_day_overrides,
     reset_calendar_cache,
     set_calendar_day_override,
@@ -48,6 +50,38 @@ def test_day_override_public_surface_admin_and_migration_are_registered() -> Non
     assert "django_bizcal_calendardayoverride" in table_names
     assert "django_bizcal_calendayoverridewindow" not in table_names
     assert "django_bizcal_calendardayoverridewindow" in table_names
+
+
+def test_day_override_admin_exposes_window_summary_and_bulk_actions() -> None:
+    override = CalendarDayOverride.objects.create(
+        calendar_name="support",
+        day=date(2026, 12, 24),
+        is_active=False,
+    )
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(9, 0),
+        end_time=time(11, 0),
+        position=0,
+    )
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(14, 0),
+        end_time=time(16, 0),
+        position=1,
+    )
+    admin_instance = admin.site._registry[CalendarDayOverride]
+
+    assert admin_instance.window_count(override) == 2
+    assert admin_instance.window_summary(override) == "09:00-11:00, 14:00-16:00"
+
+    admin_instance.activate_selected(None, CalendarDayOverride.objects.filter(pk=override.pk))
+    override.refresh_from_db()
+    assert override.is_active is True
+
+    admin_instance.deactivate_selected(None, CalendarDayOverride.objects.filter(pk=override.pk))
+    override.refresh_from_db()
+    assert override.is_active is False
 
 
 def test_day_override_model_uniqueness_and_window_position_uniqueness() -> None:
@@ -113,6 +147,26 @@ def test_replace_day_override_windows_normalizes_and_reindexes_rows() -> None:
     assert rows[0].position == 0
     assert rows[0].start_time == time(10, 0)
     assert rows[0].end_time == time(16, 0)
+
+
+def test_day_override_window_helpers_return_domain_friendly_shapes() -> None:
+    set_calendar_day_override(
+        "support",
+        "2026-12-24",
+        [("10:00", "12:00"), ("14:00", "16:00")],
+    )
+    set_calendar_day_override("support", "2026-12-31", [])
+
+    listed = list_calendar_day_override_windows("support")
+    single = get_calendar_day_override_windows("support", "2026-12-24")
+    closed = get_calendar_day_override_windows("support", "2026-12-31")
+
+    assert single == listed[date(2026, 12, 24)]
+    assert single is not None
+    assert len(single) == 2
+    assert single[0].start == time(10, 0)
+    assert single[1].end == time(16, 0)
+    assert closed == ()
 
 
 def test_database_day_override_provider_uses_prefetch_without_n_plus_one_queries() -> None:

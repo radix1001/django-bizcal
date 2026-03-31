@@ -167,9 +167,12 @@ Stable Django-specific exports include:
 - `get_calendar(name)`
 - `list_configured_calendars()`
 - `list_calendar_holidays(...)`
+- `list_calendar_holiday_days(...)`
 - `list_calendar_day_overrides(...)`
+- `list_calendar_day_override_windows(...)`
 - `get_calendar_holiday(...)`
 - `get_calendar_day_override(...)`
+- `get_calendar_day_override_windows(...)`
 - `set_calendar_holiday(...)`
 - `set_calendar_day_override(...)`
 - `activate_calendar_holiday(...)`

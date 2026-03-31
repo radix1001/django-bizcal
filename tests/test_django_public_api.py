@@ -17,9 +17,12 @@ from django_bizcal.django_api import (
     delete_calendar_holiday,
     get_calendar,
     get_calendar_day_override,
+    get_calendar_day_override_windows,
     get_calendar_holiday,
     get_default_calendar,
+    list_calendar_day_override_windows,
     list_calendar_day_overrides,
+    list_calendar_holiday_days,
     list_calendar_holidays,
     list_configured_calendars,
     now,
@@ -48,9 +51,12 @@ def test_django_api_exports_stable_helpers() -> None:
     assert delete_calendar_holiday is not None
     assert get_calendar is not None
     assert get_calendar_day_override is not None
+    assert get_calendar_day_override_windows is not None
     assert get_calendar_holiday is not None
     assert get_default_calendar is not None
     assert list_calendar_day_overrides is not None
+    assert list_calendar_day_override_windows is not None
+    assert list_calendar_holiday_days is not None
     assert list_calendar_holidays is not None
     assert list_configured_calendars is not None
     assert now is not None

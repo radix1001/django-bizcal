@@ -220,6 +220,8 @@ Preferred Django-specific imports:
 from django_bizcal.django_api import get_calendar, set_calendar_holiday
 ```
 
+If you need to inspect persisted state without working with ORM relations directly, the Django service layer also exposes helpers such as `list_calendar_holiday_days(...)`, `list_calendar_day_override_windows(...)`, and `get_calendar_day_override_windows(...)`.
+
 ## Calendar builder
 
 ```python

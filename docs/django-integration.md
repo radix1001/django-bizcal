@@ -211,6 +211,10 @@ The Django service layer also exposes convenience helpers that invalidate the ca
 
 These helpers are the recommended way to manage `CalendarHoliday` rows from application code because they keep `get_calendar(name)` and `get_default_calendar()` coherent without requiring a manual `reset_calendar_cache()`.
 
+For read-only inspection without touching ORM relations directly, you can also use:
+
+- `list_calendar_holiday_days(calendar_name, include_inactive=False)`
+
 Cache behavior:
 
 - `reset_calendar_cache()` clears all named calendar instances
@@ -244,7 +248,9 @@ The uniqueness constraint on `CalendarDayOverride` is `(calendar_name, day)`, an
 The Django service layer also exposes convenience helpers for persisted intraday schedule replacements:
 
 - `list_calendar_day_overrides(calendar_name, include_inactive=False)`
+- `list_calendar_day_override_windows(calendar_name, include_inactive=False)`
 - `get_calendar_day_override(calendar_name, day, include_inactive=False)`
+- `get_calendar_day_override_windows(calendar_name, day, include_inactive=False)`
 - `set_calendar_day_override(calendar_name, day, windows, name="", is_active=True)`
 - `activate_calendar_day_override(calendar_name, day, windows=None, name=None)`
 - `deactivate_calendar_day_override(calendar_name, day)`
@@ -252,6 +258,7 @@ The Django service layer also exposes convenience helpers for persisted intraday
 - `sync_calendar_day_overrides(calendar_name, overrides)`
 
 These helpers normalize windows before saving them and invalidate only the affected named calendar cache entry after each mutation.
+The `*_windows(...)` helpers return normalized `TimeWindow` tuples so application code can inspect persisted schedules without traversing ORM relations.
 
 Precedence rules:
 
