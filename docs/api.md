@@ -156,6 +156,7 @@ For Django-only persistence and service helpers, use `django_bizcal.django_api`.
 
 Stable Django-specific exports include:
 
+- `CalendarResolution`
 - `CalendarHoliday`
 - `CalendarDayOverride`
 - `CalendarDayOverrideWindow`
@@ -165,6 +166,8 @@ Stable Django-specific exports include:
 - `apply_database_overrides(...)`
 - `get_default_calendar()`
 - `get_calendar(name)`
+- `resolve_calendar_for(context=None, **kwargs)`
+- `get_calendar_for(context=None, **kwargs)`
 - `list_configured_calendars()`
 - `list_calendar_holidays(...)`
 - `list_calendar_holiday_days(...)`
@@ -183,3 +186,25 @@ Stable Django-specific exports include:
 - `delete_calendar_day_override(...)`
 - `sync_calendar_holidays(...)`
 - `sync_calendar_day_overrides(...)`
+
+### Context-aware resolution
+
+`resolve_calendar_for(...)` delegates to `BIZCAL_CALENDAR_RESOLVER` and normalizes the result into `CalendarResolution`.
+
+Supported resolver outputs:
+
+- a named calendar such as `"support_cl"`
+- a serializable `CalendarConfig`
+- `CalendarResolution`
+
+`CalendarResolution` fields:
+
+- `name`: logical calendar name, also used for persisted override lookup when DB models are enabled
+- `config`: explicit calendar definition to build instead of looking up a named config from settings
+- `cache_key`: optional memoization key for config-based contextual calendars
+
+`get_calendar_for(...)` resolves the context and returns a built calendar:
+
+- named resolutions reuse the existing named calendar cache
+- config-only resolutions build an ad hoc calendar each call unless `cache_key` is provided
+- config resolutions with both `name` and `cache_key` can also participate in persisted holiday and day-override application plus targeted cache invalidation

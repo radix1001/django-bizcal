@@ -4,6 +4,7 @@ from django_bizcal.django_api import (
     CalendarDayOverride,
     CalendarDayOverrideWindow,
     CalendarHoliday,
+    CalendarResolution,
     DatabaseDayOverrideProvider,
     DatabaseHolidayProvider,
     activate_calendar_day_override,
@@ -18,6 +19,7 @@ from django_bizcal.django_api import (
     get_calendar,
     get_calendar_day_override,
     get_calendar_day_override_windows,
+    get_calendar_for,
     get_calendar_holiday,
     get_default_calendar,
     list_calendar_day_override_windows,
@@ -27,6 +29,7 @@ from django_bizcal.django_api import (
     list_configured_calendars,
     now,
     reset_calendar_cache,
+    resolve_calendar_for,
     set_calendar_day_override,
     set_calendar_holiday,
     sync_calendar_day_overrides,
@@ -38,6 +41,7 @@ def test_django_api_exports_stable_helpers() -> None:
     assert CalendarDayOverride is not None
     assert CalendarDayOverrideWindow is not None
     assert CalendarHoliday is not None
+    assert CalendarResolution is not None
     assert DatabaseDayOverrideProvider is not None
     assert DatabaseHolidayProvider is not None
     assert activate_calendar_day_override is not None
@@ -50,6 +54,7 @@ def test_django_api_exports_stable_helpers() -> None:
     assert delete_calendar_day_override is not None
     assert delete_calendar_holiday is not None
     assert get_calendar is not None
+    assert get_calendar_for is not None
     assert get_calendar_day_override is not None
     assert get_calendar_day_override_windows is not None
     assert get_calendar_holiday is not None
@@ -61,6 +66,7 @@ def test_django_api_exports_stable_helpers() -> None:
     assert list_configured_calendars is not None
     assert now is not None
     assert reset_calendar_cache is not None
+    assert resolve_calendar_for is not None
     assert set_calendar_day_override is not None
     assert set_calendar_holiday is not None
     assert sync_calendar_day_overrides is not None

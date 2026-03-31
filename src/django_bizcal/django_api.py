@@ -7,6 +7,7 @@ from .db import (
     apply_database_overrides,
 )
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
+from .resolvers import CalendarResolution
 from .services import (
     activate_calendar_day_override,
     activate_calendar_holiday,
@@ -18,6 +19,7 @@ from .services import (
     get_calendar,
     get_calendar_day_override,
     get_calendar_day_override_windows,
+    get_calendar_for,
     get_calendar_holiday,
     get_default_calendar,
     list_calendar_day_override_windows,
@@ -27,6 +29,7 @@ from .services import (
     list_configured_calendars,
     now,
     reset_calendar_cache,
+    resolve_calendar_for,
     set_calendar_day_override,
     set_calendar_holiday,
     sync_calendar_day_overrides,
@@ -37,6 +40,7 @@ __all__ = [
     "CalendarDayOverride",
     "CalendarDayOverrideWindow",
     "CalendarHoliday",
+    "CalendarResolution",
     "DatabaseDayOverrideProvider",
     "DatabaseHolidayProvider",
     "activate_calendar_day_override",
@@ -49,6 +53,7 @@ __all__ = [
     "delete_calendar_day_override",
     "delete_calendar_holiday",
     "get_calendar",
+    "get_calendar_for",
     "get_calendar_day_override",
     "get_calendar_day_override_windows",
     "get_calendar_holiday",
@@ -60,6 +65,7 @@ __all__ = [
     "list_configured_calendars",
     "now",
     "reset_calendar_cache",
+    "resolve_calendar_for",
     "set_calendar_day_override",
     "set_calendar_holiday",
     "sync_calendar_day_overrides",

@@ -19,6 +19,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Explicit timezone support based on `zoneinfo`.
 - Reusable Django app with namespaced settings and service helpers.
 - Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
+- Context-aware Django calendar resolution for tenant, client, or region specific lookups.
 - Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
 
 ## Installation
@@ -177,6 +178,54 @@ from django_bizcal.services import get_calendar, get_default_calendar
 support = get_default_calendar()
 regional_ops = get_calendar("operations_latam")
 ```
+
+For tenant-, client-, or region-aware lookups, configure a contextual resolver:
+
+```python
+from django_bizcal.django_api import CalendarResolution
+
+
+def support_calendar_resolver(*, context, bizcal_settings):
+    region = str(context["region"]).strip().lower()
+    if region in {"cl", "mx"}:
+        return f"support_{region}"
+    tenant = str(context["tenant"]).strip().lower()
+    return CalendarResolution.for_config(
+        {
+            "type": "working",
+            "tz": "America/Santiago",
+            "weekly_schedule": {
+                "0": [["09:00", "18:00"]],
+                "1": [["09:00", "18:00"]],
+                "2": [["09:00", "18:00"]],
+                "3": [["09:00", "18:00"]],
+                "4": [["09:00", "18:00"]],
+            },
+        },
+        name=f"tenant:{tenant}",
+        cache_key=f"tenant:{tenant}",
+    )
+
+
+BIZCAL_CALENDAR_RESOLVER = support_calendar_resolver
+```
+
+Then resolve calendars from application context:
+
+```python
+from django_bizcal.django_api import get_calendar_for
+
+regional_support = get_calendar_for(region="cl")
+tenant_calendar = get_calendar_for(tenant="acme", region="cl")
+```
+
+Resolver return values can be:
+
+- a logical calendar name such as `"support_cl"`
+- a serializable calendar config mapping
+- `CalendarResolution`, which can carry both a config and a logical `name` plus an optional `cache_key`
+
+When `BIZCAL_ENABLE_DB_MODELS = True`, a contextual resolution with `CalendarResolution(name=..., config=...)` also participates in persisted holiday and per-day override application for that logical name.
 
 Persisted holiday closures and per-day overrides can be enabled for named Django calendars:
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Added contextual Django calendar resolution through `BIZCAL_CALENDAR_RESOLVER`, `CalendarResolution`, `resolve_calendar_for(...)`, and `get_calendar_for(...)`.
+- Added support for resolver outputs that return either named calendars or ad hoc calendar configs, with optional contextual memoization via `cache_key`.
+- Added selective invalidation of contextual calendar cache entries when persisted holiday or day-override changes affect the same logical calendar name.
+- Expanded the stable Django-specific public API, tests, examples, and documentation for multi-tenant, client, and region-aware calendar lookup patterns.
+
 ## 0.3.0
 
 - Added persisted per-day schedule overrides for named Django calendars with the `CalendarDayOverride` and `CalendarDayOverrideWindow` models.

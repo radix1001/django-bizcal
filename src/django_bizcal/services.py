@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from datetime import date
 from threading import RLock
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
@@ -11,11 +12,11 @@ from django.db import transaction
 from django.db.models import Prefetch
 from django.utils import timezone as django_timezone
 
-from .builder import CalendarBuilder
 from .calendars.base import BusinessCalendar
 from .config import CalendarConfig
 from .db import replace_day_override_windows
-from .exceptions import ValidationError
+from .exceptions import CalendarConfigurationError, ValidationError
+from .resolvers import CalendarResolution, normalize_calendar_resolution
 from .settings import get_bizcal_settings
 from .types import DateInput, TimeInput, coerce_date
 from .windows import TimeWindow, build_time_windows
@@ -29,6 +30,13 @@ else:
 
 _CALENDAR_CACHE: dict[str, BusinessCalendar] = {}
 _CALENDAR_CACHE_LOCK = RLock()
+_CONTEXT_CALENDAR_CACHE: dict[str, _ContextCalendarCacheEntry] = {}
+
+
+@dataclass(frozen=True, slots=True)
+class _ContextCalendarCacheEntry:
+    calendar: BusinessCalendar
+    invalidate_names: frozenset[str]
 
 
 def get_calendar(name: str) -> BusinessCalendar:
@@ -50,14 +58,51 @@ def get_default_calendar() -> BusinessCalendar:
     return get_calendar(current_settings.default_calendar_name)
 
 
+def resolve_calendar_for(
+    context: Mapping[str, Any] | None = None,
+    **kwargs: Any,
+) -> CalendarResolution:
+    """Resolve a contextual calendar target using `BIZCAL_CALENDAR_RESOLVER`."""
+    resolved_context = _normalize_context(context, kwargs)
+    current_settings = get_bizcal_settings()
+    resolver = current_settings.calendar_resolver
+    if resolver is None:
+        raise CalendarConfigurationError(
+            "BIZCAL_CALENDAR_RESOLVER is not configured. "
+            "Use get_calendar(name) for direct named lookups or configure a contextual resolver."
+        )
+    return normalize_calendar_resolution(
+        resolver(context=resolved_context, bizcal_settings=current_settings)
+    )
+
+
+def get_calendar_for(
+    context: Mapping[str, Any] | None = None,
+    **kwargs: Any,
+) -> BusinessCalendar:
+    """Resolve and return a business calendar for tenant-, region-, or client-like context."""
+    resolution = resolve_calendar_for(context, **kwargs)
+    if resolution.config is None:
+        assert resolution.name is not None
+        return get_calendar(resolution.name)
+    if resolution.cache_key is None:
+        return _build_contextual_calendar(resolution)
+    with _CALENDAR_CACHE_LOCK:
+        cached = _CONTEXT_CALENDAR_CACHE.get(resolution.cache_key)
+        if cached is not None:
+            return cached.calendar
+    calendar = _build_contextual_calendar(resolution)
+    invalidate_names = frozenset((resolution.name,)) if resolution.name else frozenset()
+    entry = _ContextCalendarCacheEntry(calendar=calendar, invalidate_names=invalidate_names)
+    with _CALENDAR_CACHE_LOCK:
+        return _CONTEXT_CALENDAR_CACHE.setdefault(resolution.cache_key, entry).calendar
+
+
 def build_calendar(config: CalendarConfig | dict[str, Any]) -> BusinessCalendar:
     """Build a calendar using Django defaults as fallback context."""
     current_settings = get_bizcal_settings()
-    return CalendarBuilder.from_dict(
+    return current_settings.build_calendar_from_config(
         config,
-        default_tz=current_settings.default_timezone.key,
-        default_country=current_settings.default_country,
-        preload_years=current_settings.preload_years,
     )
 
 
@@ -528,8 +573,17 @@ def reset_calendar_cache(name: str | None = None) -> None:
     with _CALENDAR_CACHE_LOCK:
         if name is None:
             _CALENDAR_CACHE.clear()
+            _CONTEXT_CALENDAR_CACHE.clear()
             return
-        _CALENDAR_CACHE.pop(_normalize_calendar_name(name), None)
+        normalized_name = _normalize_calendar_name(name)
+        _CALENDAR_CACHE.pop(normalized_name, None)
+        stale_context_keys = [
+            cache_key
+            for cache_key, entry in _CONTEXT_CALENDAR_CACHE.items()
+            if normalized_name in entry.invalidate_names
+        ]
+        for cache_key in stale_context_keys:
+            _CONTEXT_CALENDAR_CACHE.pop(cache_key, None)
 
 
 def _normalize_calendar_name(value: str) -> str:
@@ -537,6 +591,31 @@ def _normalize_calendar_name(value: str) -> str:
     if not name:
         raise ValidationError("calendar_name must not be blank.")
     return name
+
+
+def _normalize_context(
+    context: Mapping[str, Any] | None,
+    kwargs: dict[str, Any],
+) -> dict[str, Any]:
+    if context is None:
+        resolved: dict[str, Any] = {}
+    else:
+        resolved = dict(context)
+    overlapping_keys = set(resolved).intersection(kwargs)
+    if overlapping_keys:
+        duplicate = ", ".join(sorted(overlapping_keys))
+        raise ValidationError(f"Duplicate context keys provided: {duplicate}.")
+    resolved.update(kwargs)
+    return resolved
+
+
+def _build_contextual_calendar(resolution: CalendarResolution) -> BusinessCalendar:
+    current_settings = get_bizcal_settings()
+    assert resolution.config is not None
+    return current_settings.build_calendar_from_config(
+        resolution.config,
+        calendar_name=resolution.name,
+    )
 
 
 def _override_windows(override: CalendarDayOverrideRow) -> tuple[TimeWindow, ...]:

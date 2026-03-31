@@ -60,6 +60,7 @@ Modules:
 - `apps.py`
 - `settings.py`
 - `services.py`
+- `resolvers.py`
 - `models.py`
 - `db.py`
 
@@ -69,6 +70,7 @@ Responsibilities:
 - Resolve namespaced settings
 - Build and cache the default calendar
 - Resolve named calendars and optionally apply persisted holiday closures and day overrides
+- Resolve calendars from tenant-, client-, or region-like context through a pluggable resolver hook
 - Provide helpers that fit typical Django service usage
 
 No domain logic depends on ORM models, request objects, middleware, or settings globals.
@@ -84,6 +86,7 @@ The chosen strategy is:
 - Add only the smallest persistence units with immediate value:
   - persisted holiday closures keyed by logical calendar name
   - persisted per-day override windows keyed by logical calendar name and date
+- Keep contextual calendar selection in application code through `BIZCAL_CALENDAR_RESOLVER` instead of persisting full calendar graphs prematurely
 - Keep weekly schedules and composition declarative rather than ORM-managed for now.
 
 This keeps the library lighter, easier to test, and easier to embed into other Django codebases while still unlocking tenant- or client-specific closed dates and one-off special schedules.

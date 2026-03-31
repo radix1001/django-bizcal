@@ -6,16 +6,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo
 
 from django.conf import settings as django_settings
+from django.utils.module_loading import import_string
 
 from .builder import CalendarBuilder
 from .calendars.base import BusinessCalendar
 from .config import CalendarConfig
 from .exceptions import CalendarConfigurationError
 from .types import coerce_zoneinfo
+
+if TYPE_CHECKING:
+    from .resolvers import CalendarResolver
 
 DEFAULT_WEEKLY_SCHEDULE: dict[int, list[tuple[str, str]]] = {
     0: [("09:00", "18:00")],
@@ -37,6 +41,7 @@ class BizcalSettings:
     default_calendar_name: str
     default_calendar_config: CalendarConfig
     calendar_configs: dict[str, CalendarConfig]
+    calendar_resolver: CalendarResolver | None
 
     @classmethod
     def load(cls) -> BizcalSettings:
@@ -59,6 +64,9 @@ class BizcalSettings:
             default_timezone,
         )
         enable_db_models = bool(getattr(django_settings, "BIZCAL_ENABLE_DB_MODELS", False))
+        calendar_resolver = _resolve_calendar_resolver(
+            getattr(django_settings, "BIZCAL_CALENDAR_RESOLVER", None)
+        )
         configured_default = getattr(django_settings, "BIZCAL_DEFAULT_CALENDAR", None)
         default_was_explicit = configured_default is not None
         if configured_default is None:
@@ -87,6 +95,7 @@ class BizcalSettings:
             default_calendar_name=default_calendar_name,
             default_calendar_config=calendar_configs[default_calendar_name],
             calendar_configs=calendar_configs,
+            calendar_resolver=calendar_resolver,
         )
 
     @cached_property
@@ -96,17 +105,29 @@ class BizcalSettings:
 
     def build_calendar(self, name: str) -> BusinessCalendar:
         """Build a configured named calendar using Django defaults as fallback context."""
-        calendar = CalendarBuilder.from_dict(
+        return self.build_calendar_from_config(
             self.get_calendar_config(name),
+            calendar_name=name,
+        )
+
+    def build_calendar_from_config(
+        self,
+        config: CalendarConfig | dict[str, Any],
+        *,
+        calendar_name: str | None = None,
+    ) -> BusinessCalendar:
+        """Build a calendar config using Django defaults and optional DB overrides."""
+        calendar = CalendarBuilder.from_dict(
+            config,
             default_tz=self.default_timezone.key,
             default_country=self.default_country,
             preload_years=self.preload_years,
         )
-        if not self.enable_db_models:
+        if not self.enable_db_models or calendar_name is None:
             return calendar
         from .db import apply_database_overrides
 
-        return apply_database_overrides(calendar, calendar_name=name)
+        return apply_database_overrides(calendar, calendar_name=calendar_name)
 
     def get_calendar_config(self, name: str) -> CalendarConfig:
         """Return a configured calendar definition by logical name."""
@@ -122,6 +143,20 @@ class BizcalSettings:
 def get_bizcal_settings() -> BizcalSettings:
     """Return resolved settings for the current Django process."""
     return BizcalSettings.load()
+
+
+def _resolve_calendar_resolver(value: Any) -> CalendarResolver | None:
+    from .resolvers import CalendarResolver
+
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = import_string(value)
+    if not callable(value):
+        raise ValueError(
+            "BIZCAL_CALENDAR_RESOLVER must be a callable or dotted import path."
+        )
+    return cast(CalendarResolver, value)
 
 
 def _resolve_preload_years(value: Any, timezone: ZoneInfo) -> tuple[int, ...]:

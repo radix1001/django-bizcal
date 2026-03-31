@@ -75,3 +75,25 @@ def test_settings_require_default_name_to_exist_in_named_registry(settings) -> N
     reset_calendar_cache()
     with pytest.raises(ValueError):
         get_bizcal_settings()
+
+
+def test_settings_load_calendar_resolver_from_dotted_path(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_CALENDAR_RESOLVER = (
+        "tests.django_test_project.calendar_resolvers.region_calendar_resolver"
+    )
+    reset_calendar_cache()
+
+    resolved = get_bizcal_settings()
+
+    assert resolved.calendar_resolver is not None
+    assert callable(resolved.calendar_resolver)
+
+
+def test_settings_reject_invalid_calendar_resolver(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_CALENDAR_RESOLVER = 123
+    reset_calendar_cache()
+
+    with pytest.raises(ValueError):
+        get_bizcal_settings()
