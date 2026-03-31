@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from functools import cached_property
@@ -13,6 +14,7 @@ from .calendars.base import BusinessCalendar
 from .calendars.composite import OverrideCalendar, OverrideInput
 from .exceptions import ValidationError
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
+from .types import TimeInput
 from .windows import TimeWindow, build_time_windows
 
 
@@ -141,6 +143,28 @@ def apply_database_overrides(
     if not overrides:
         return calendar
     return OverrideCalendar(calendar, overrides=cast(OverrideInput, overrides), tz=calendar.tz)
+
+
+def replace_day_override_windows(
+    override: CalendarDayOverride,
+    windows: Iterable[tuple[TimeInput, TimeInput] | TimeWindow],
+    *,
+    using: str = "default",
+) -> None:
+    """Replace a persisted override's windows with normalized ordered rows."""
+    normalized_windows = build_time_windows(windows)
+    CalendarDayOverrideWindow.objects.using(using).filter(override=override).delete()
+    CalendarDayOverrideWindow.objects.using(using).bulk_create(
+        [
+            CalendarDayOverrideWindow(
+                override=override,
+                start_time=window.start,
+                end_time=window.end,
+                position=position,
+            )
+            for position, window in enumerate(normalized_windows)
+        ]
+    )
 
 
 def _normalize_calendar_name(value: str, *, provider_name: str) -> str:

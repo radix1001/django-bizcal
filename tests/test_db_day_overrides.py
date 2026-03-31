@@ -14,6 +14,7 @@ from django_bizcal.db import (
     DatabaseDayOverrideProvider,
     DatabaseHolidayProvider,
     apply_database_overrides,
+    replace_day_override_windows,
 )
 from django_bizcal.django_api import (
     CalendarDayOverride,
@@ -92,6 +93,28 @@ def test_database_day_override_provider_reads_active_rows_and_normalizes_windows
     assert provider.overrides[date(2026, 12, 24)][0].end == time(14, 0)
 
 
+def test_replace_day_override_windows_normalizes_and_reindexes_rows() -> None:
+    override = CalendarDayOverride.objects.create(calendar_name="support", day=date(2026, 12, 24))
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(14, 0),
+        end_time=time(16, 0),
+        position=3,
+    )
+
+    replace_day_override_windows(
+        override,
+        [("10:00", "12:00"), ("12:00", "14:00"), ("14:00", "16:00")],
+    )
+
+    rows = list(override.windows.all().order_by("position", "start_time", "end_time"))
+
+    assert len(rows) == 1
+    assert rows[0].position == 0
+    assert rows[0].start_time == time(10, 0)
+    assert rows[0].end_time == time(16, 0)
+
+
 def test_database_day_override_provider_uses_prefetch_without_n_plus_one_queries() -> None:
     set_calendar_day_override("support", "2026-12-24", [("09:00", "11:00")])
     set_calendar_day_override("support", "2026-12-31", [("14:00", "16:00")])
@@ -147,6 +170,46 @@ def test_apply_database_overrides_gives_day_override_precedence_over_holiday() -
     assert windows[0].end == datetime(2026, 12, 24, 12, 0, tzinfo=ZoneInfo("UTC"))
     assert windows[1].start == datetime(2026, 12, 24, 14, 0, tzinfo=ZoneInfo("UTC"))
     assert windows[1].end == datetime(2026, 12, 24, 16, 0, tzinfo=ZoneInfo("UTC"))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_direct_orm_day_override_changes_invalidate_named_calendar_cache(settings) -> None:
+    settings.BIZCAL_ENABLE_DB_MODELS = True
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"3": [["09:00", "18:00"]]},
+        }
+    }
+    reset_calendar_cache()
+
+    before = get_calendar("support")
+    assert before.business_windows_for_day(date(2026, 12, 24))[0].start == datetime(
+        2026,
+        12,
+        24,
+        9,
+        0,
+        tzinfo=ZoneInfo("UTC"),
+    )
+
+    override = CalendarDayOverride.objects.create(calendar_name="support", day=date(2026, 12, 24))
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(10, 0),
+        end_time=time(12, 0),
+        position=0,
+    )
+
+    after = get_calendar("support")
+    windows = after.business_windows_for_day(date(2026, 12, 24))
+
+    assert after is not before
+    assert len(windows) == 1
+    assert windows[0].start == datetime(2026, 12, 24, 10, 0, tzinfo=ZoneInfo("UTC"))
+    assert windows[0].end == datetime(2026, 12, 24, 12, 0, tzinfo=ZoneInfo("UTC"))
 
 
 def test_day_override_service_helpers_support_crud_and_sync() -> None:

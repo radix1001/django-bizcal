@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from django.contrib import admin
+from typing import Any
 
+from django.contrib import admin
+from django.forms import BaseInlineFormSet
+from django.http import HttpRequest
+
+from .db import replace_day_override_windows
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
+from .services import reset_calendar_cache
 
 
 class CalendarDayOverrideWindowInline(admin.TabularInline):  # type: ignore[misc]
@@ -24,6 +30,21 @@ class CalendarHolidayAdmin(admin.ModelAdmin):  # type: ignore[misc]
     search_fields = ("calendar_name", "name")
     ordering = ("calendar_name", "day")
 
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: CalendarHoliday,
+        form: Any,
+        change: bool,
+    ) -> None:
+        super().save_model(request, obj, form, change)
+        reset_calendar_cache(obj.calendar_name)
+
+    def delete_model(self, request: HttpRequest, obj: CalendarHoliday) -> None:
+        calendar_name = obj.calendar_name
+        super().delete_model(request, obj)
+        reset_calendar_cache(calendar_name)
+
 
 @admin.register(CalendarDayOverride)
 class CalendarDayOverrideAdmin(admin.ModelAdmin):  # type: ignore[misc]
@@ -34,3 +55,43 @@ class CalendarDayOverrideAdmin(admin.ModelAdmin):  # type: ignore[misc]
     search_fields = ("calendar_name", "name")
     ordering = ("calendar_name", "day")
     inlines = [CalendarDayOverrideWindowInline]
+
+    def save_model(
+        self,
+        request: HttpRequest,
+        obj: CalendarDayOverride,
+        form: Any,
+        change: bool,
+    ) -> None:
+        super().save_model(request, obj, form, change)
+        reset_calendar_cache(obj.calendar_name)
+
+    def save_related(
+        self,
+        request: HttpRequest,
+        form: Any,
+        formsets: list[BaseInlineFormSet[Any]],
+        change: bool,
+    ) -> None:
+        super().save_related(request, form, formsets, change)
+        override = form.instance
+        using = override._state.db or "default"
+        replace_day_override_windows(
+            override,
+            (
+                (window.start_time, window.end_time)
+                for window in override.windows.all().order_by(
+                    "position",
+                    "start_time",
+                    "end_time",
+                    "pk",
+                )
+            ),
+            using=using,
+        )
+        reset_calendar_cache(override.calendar_name)
+
+    def delete_model(self, request: HttpRequest, obj: CalendarDayOverride) -> None:
+        calendar_name = obj.calendar_name
+        super().delete_model(request, obj)
+        reset_calendar_cache(calendar_name)

@@ -251,3 +251,27 @@ def test_database_holidays_are_ignored_when_feature_flag_is_disabled(settings) -
     calendar = get_calendar("support")
 
     assert calendar.is_business_day(date(2026, 12, 24)) is True
+
+
+@pytest.mark.django_db(transaction=True)
+def test_direct_orm_holiday_changes_invalidate_named_calendar_cache(settings) -> None:
+    settings.BIZCAL_ENABLE_DB_MODELS = True
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"3": [["09:00", "18:00"]]},
+        }
+    }
+    reset_calendar_cache()
+
+    before = get_calendar("support")
+    assert before.is_business_day(date(2026, 12, 24)) is True
+
+    CalendarHoliday.objects.create(calendar_name="support", day=date(2026, 12, 24), name="Shutdown")
+
+    after = get_calendar("support")
+
+    assert after is not before
+    assert after.is_business_day(date(2026, 12, 24)) is False

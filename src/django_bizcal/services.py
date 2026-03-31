@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from threading import RLock
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from django.db import transaction
 from django.utils import timezone as django_timezone
@@ -12,13 +12,18 @@ from django.utils import timezone as django_timezone
 from .builder import CalendarBuilder
 from .calendars.base import BusinessCalendar
 from .config import CalendarConfig
+from .db import replace_day_override_windows
 from .exceptions import ValidationError
 from .settings import get_bizcal_settings
 from .types import DateInput, TimeInput, coerce_date
 from .windows import TimeWindow, build_time_windows
 
-CalendarHolidayRow: TypeAlias = Any
-CalendarDayOverrideRow: TypeAlias = Any
+if TYPE_CHECKING:
+    from .models import CalendarDayOverride as CalendarDayOverrideRow
+    from .models import CalendarHoliday as CalendarHolidayRow
+else:
+    CalendarHolidayRow: TypeAlias = Any
+    CalendarDayOverrideRow: TypeAlias = Any
 
 _CALENDAR_CACHE: dict[str, BusinessCalendar] = {}
 _CALENDAR_CACHE_LOCK = RLock()
@@ -118,7 +123,7 @@ def get_calendar_holiday(
     )
     if not include_inactive:
         queryset = queryset.filter(is_active=True)
-    return queryset.first()
+    return cast(CalendarHolidayRow | None, queryset.first())
 
 
 def get_calendar_day_override(
@@ -140,7 +145,7 @@ def get_calendar_day_override(
     )
     if not include_inactive:
         queryset = queryset.filter(is_active=True)
-    return queryset.first()
+    return cast(CalendarDayOverrideRow | None, queryset.first())
 
 
 def set_calendar_holiday(
@@ -165,7 +170,7 @@ def set_calendar_holiday(
         },
     )
     reset_calendar_cache(normalized_name)
-    return holiday
+    return cast(CalendarHolidayRow, holiday)
 
 
 def set_calendar_day_override(
@@ -178,11 +183,10 @@ def set_calendar_day_override(
     using: str = "default",
 ) -> CalendarDayOverrideRow:
     """Create or update a persisted per-day schedule override."""
-    from .models import CalendarDayOverride, CalendarDayOverrideWindow
+    from .models import CalendarDayOverride
 
     normalized_name = _normalize_calendar_name(calendar_name)
     normalized_day = coerce_date(day)
-    normalized_windows = build_time_windows(windows)
 
     with transaction.atomic(using=using):
         override, _ = CalendarDayOverride.objects.using(using).update_or_create(
@@ -193,25 +197,16 @@ def set_calendar_day_override(
                 "is_active": is_active,
             },
         )
-        CalendarDayOverrideWindow.objects.using(using).filter(override=override).delete()
-        CalendarDayOverrideWindow.objects.using(using).bulk_create(
-            [
-                CalendarDayOverrideWindow(
-                    override=override,
-                    start_time=window.start,
-                    end_time=window.end,
-                    position=position,
-                )
-                for position, window in enumerate(normalized_windows)
-            ]
-        )
+        replace_day_override_windows(override, windows, using=using)
     reset_calendar_cache(normalized_name)
-    return get_calendar_day_override(
+    override = get_calendar_day_override(
         normalized_name,
         normalized_day,
         include_inactive=True,
         using=using,
     )
+    assert override is not None
+    return override
 
 
 def activate_calendar_holiday(
@@ -393,7 +388,7 @@ def sync_calendar_day_overrides(
     using: str = "default",
 ) -> tuple[CalendarDayOverrideRow, ...]:
     """Make the active day-override set exactly match the provided mapping."""
-    from .models import CalendarDayOverride, CalendarDayOverrideWindow
+    from .models import CalendarDayOverride
 
     normalized_name = _normalize_calendar_name(calendar_name)
     normalized_overrides = {
@@ -421,18 +416,7 @@ def sync_calendar_day_overrides(
             elif not override.is_active:
                 override.is_active = True
                 override.save(update_fields=["is_active", "updated_at"])
-            CalendarDayOverrideWindow.objects.using(using).filter(override=override).delete()
-            CalendarDayOverrideWindow.objects.using(using).bulk_create(
-                [
-                    CalendarDayOverrideWindow(
-                        override=override,
-                        start_time=window.start,
-                        end_time=window.end,
-                        position=position,
-                    )
-                    for position, window in enumerate(windows)
-                ]
-            )
+            replace_day_override_windows(override, windows, using=using)
             saved.append(override)
 
         for stale_day, override in existing_by_day.items():
@@ -441,10 +425,17 @@ def sync_calendar_day_overrides(
                 override.save(update_fields=["is_active", "updated_at"])
 
     reset_calendar_cache(normalized_name)
-    return tuple(
-        get_calendar_day_override(normalized_name, override.day, include_inactive=True, using=using)
-        for override in saved
-    )
+    refreshed: list[CalendarDayOverrideRow] = []
+    for override in saved:
+        current = get_calendar_day_override(
+            normalized_name,
+            override.day,
+            include_inactive=True,
+            using=using,
+        )
+        assert current is not None
+        refreshed.append(current)
+    return tuple(refreshed)
 
 
 def reset_calendar_cache(name: str | None = None) -> None:
