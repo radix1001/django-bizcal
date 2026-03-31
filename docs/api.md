@@ -157,14 +157,26 @@ For Django-only persistence and service helpers, use `django_bizcal.django_api`.
 Stable Django-specific exports include:
 
 - `CalendarHoliday`
+- `CalendarDayOverride`
+- `CalendarDayOverrideWindow`
+- `DatabaseDayOverrideProvider`
 - `DatabaseHolidayProvider`
+- `apply_database_holiday_overrides(...)`
+- `apply_database_overrides(...)`
 - `get_default_calendar()`
 - `get_calendar(name)`
 - `list_configured_calendars()`
 - `list_calendar_holidays(...)`
+- `list_calendar_day_overrides(...)`
 - `get_calendar_holiday(...)`
+- `get_calendar_day_override(...)`
 - `set_calendar_holiday(...)`
+- `set_calendar_day_override(...)`
 - `activate_calendar_holiday(...)`
+- `activate_calendar_day_override(...)`
 - `deactivate_calendar_holiday(...)`
+- `deactivate_calendar_day_override(...)`
 - `delete_calendar_holiday(...)`
+- `delete_calendar_day_override(...)`
 - `sync_calendar_holidays(...)`
+- `sync_calendar_day_overrides(...)`

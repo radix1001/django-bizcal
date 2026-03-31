@@ -49,7 +49,7 @@ def test_django_persistence_public_surface_and_admin_registration() -> None:
 
 def test_django_persistence_migration_is_registered() -> None:
     executor = MigrationExecutor(connection)
-    assert ("django_bizcal", "0001_initial") in executor.loader.graph.leaf_nodes()
+    assert ("django_bizcal", "0001_initial") in executor.loader.graph.nodes
     assert "django_bizcal_calendarholiday" in connection.introspection.table_names()
 
 

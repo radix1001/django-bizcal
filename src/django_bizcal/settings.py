@@ -104,9 +104,9 @@ class BizcalSettings:
         )
         if not self.enable_db_models:
             return calendar
-        from .db import apply_database_holiday_overrides
+        from .db import apply_database_overrides
 
-        return apply_database_holiday_overrides(calendar, calendar_name=name)
+        return apply_database_overrides(calendar, calendar_name=name)
 
     def get_calendar_config(self, name: str) -> CalendarConfig:
         """Return a configured calendar definition by logical name."""

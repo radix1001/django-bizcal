@@ -18,7 +18,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
 - Reusable Django app with namespaced settings and service helpers.
-- Optional database-backed holiday closures for named Django calendars.
+- Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
 - Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
 
 ## Installation
@@ -178,15 +178,18 @@ support = get_default_calendar()
 regional_ops = get_calendar("operations_latam")
 ```
 
-Persisted holiday closures can be enabled for named Django calendars:
+Persisted holiday closures and per-day overrides can be enabled for named Django calendars:
 
 ```python
 BIZCAL_ENABLE_DB_MODELS = True
 
 from datetime import date
 
-from django_bizcal.models import CalendarHoliday
-from django_bizcal.services import set_calendar_holiday
+from django_bizcal.django_api import (
+    CalendarHoliday,
+    set_calendar_day_override,
+    set_calendar_holiday,
+)
 
 CalendarHoliday.objects.create(
     calendar_name="support",
@@ -195,10 +198,21 @@ CalendarHoliday.objects.create(
 )
 
 set_calendar_holiday("support", date(2026, 12, 31), name="Year end close")
+set_calendar_day_override(
+    "support",
+    date(2026, 12, 24),
+    [("09:00", "13:00")],
+    name="Christmas Eve half day",
+)
 ```
 
-Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically apply full-day closures from `CalendarHoliday` rows that match the logical calendar name.
-The service helpers also clear the cached named calendars automatically after each change.
+Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically apply persisted rows that match the logical calendar name:
+
+- `CalendarHoliday` closes a full day
+- `CalendarDayOverride` replaces the day with one or more explicit intraday windows
+
+If both exist for the same day, the per-day override wins because it is more specific.
+The service helpers also clear only the affected cached named calendar automatically after each change.
 
 Preferred Django-specific imports:
 
@@ -279,8 +293,8 @@ Typed declarative config helpers are also exported for IDE and static typing sup
 - The domain core lives in `src/django_bizcal` and stays framework-light.
 - `WorkingCalendar` handles business schedules and holiday lookup.
 - Composition calendars project child windows into a reference timezone.
-- The Django layer only wraps settings, AppConfig, and service helpers.
-- V1 intentionally ships without database models to keep the public core stable and reusable.
+- The Django layer wraps settings, AppConfig, service helpers, and optional persistence for named calendar closures and per-day overrides.
+- The public core remains framework-light even though Django-specific models are now available behind the reusable app boundary.
 
 See the full documentation in:
 
@@ -298,7 +312,7 @@ See the full documentation in:
 
 - Official holiday lookup requires the relevant years to be preloaded.
 - Wall-clock times are interpreted with `zoneinfo`; DST transitions affect real elapsed durations.
-- V1 does not persist calendar definitions in the database.
+- The library persists named calendar closures and per-day overrides, but not full calendar definitions or arbitrary composition graphs.
 
 ## Release
 

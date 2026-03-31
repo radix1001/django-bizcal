@@ -12,7 +12,7 @@ INSTALLED_APPS = [
 ```
 
 The app remains lightweight.
-Its persistence layer is intentionally small: one optional model for full-day holiday closures, not full calendar-definition storage.
+Its persistence layer is intentionally small: optional models for full-day closures and per-day intraday overrides, not full calendar-definition storage.
 
 ## Settings
 
@@ -45,19 +45,20 @@ If set to `3`, the integration resolves it to current year minus one through cur
 
 ### `BIZCAL_ENABLE_DB_MODELS`
 
-Enables optional database-backed holiday closures for named Django calendars.
+Enables optional database-backed closures and day overrides for named Django calendars.
 
 When enabled:
 
 - `get_default_calendar()` applies persisted closures for `BIZCAL_DEFAULT_CALENDAR_NAME`
-- `get_calendar(name)` applies persisted closures for that logical name
-- persisted closures are implemented as full-day overrides on top of the configured calendar
+- `get_calendar(name)` applies persisted overrides for that logical name
+- persisted rows are applied as substitution-based day overrides on top of the configured calendar
 
 Current scope:
 
 - backed by the `CalendarHoliday` model
+- backed by the `CalendarDayOverride` and `CalendarDayOverrideWindow` models
 - applies to named calendars resolved through the Django service layer
-- intended for organization, tenant, client, or team-specific closed dates
+- intended for organization, tenant, client, or team-specific closed dates and special schedules
 
 ### `BIZCAL_DEFAULT_CALENDAR`
 
@@ -136,7 +137,7 @@ Rules:
 Import recommendation:
 
 ```python
-from django_bizcal.django_api import get_calendar, set_calendar_holiday
+from django_bizcal.django_api import get_calendar, set_calendar_day_override, set_calendar_holiday
 ```
 
 The `django_api` module is the stable Django-specific import surface for services, persistence helpers, and the optional model/provider layer.
@@ -216,6 +217,46 @@ Cache behavior:
 - `reset_calendar_cache(name)` clears only one named calendar
 - holiday mutation helpers invalidate only the affected logical calendar
 
+### `CalendarDayOverride`
+
+Optional Django model for persisted per-day schedule replacement keyed by logical calendar name.
+
+```python
+from datetime import date
+
+from django_bizcal.django_api import set_calendar_day_override
+
+set_calendar_day_override(
+    "support",
+    date(2026, 12, 24),
+    [("09:00", "13:00"), ("14:00", "16:00")],
+    name="Christmas Eve reduced hours",
+)
+```
+
+`CalendarDayOverrideWindow` stores the ordered intraday windows that belong to a given override.
+The uniqueness constraint on `CalendarDayOverride` is `(calendar_name, day)`, and window positions are unique per override.
+
+### Calendar day override helpers
+
+The Django service layer also exposes convenience helpers for persisted intraday schedule replacements:
+
+- `list_calendar_day_overrides(calendar_name, include_inactive=False)`
+- `get_calendar_day_override(calendar_name, day, include_inactive=False)`
+- `set_calendar_day_override(calendar_name, day, windows, name="", is_active=True)`
+- `activate_calendar_day_override(calendar_name, day, windows=None, name=None)`
+- `deactivate_calendar_day_override(calendar_name, day)`
+- `delete_calendar_day_override(calendar_name, day)`
+- `sync_calendar_day_overrides(calendar_name, overrides)`
+
+These helpers normalize windows before saving them and invalidate only the affected named calendar cache entry after each mutation.
+
+Precedence rules:
+
+- `CalendarHoliday` closes the whole day
+- `CalendarDayOverride` replaces the whole day with explicit windows
+- if both exist for the same logical calendar and date, the day override wins
+
 ### `list_configured_calendars()`
 
 Return the configured logical calendar names from settings.
@@ -229,4 +270,5 @@ Useful in tests or reload scenarios after changing settings.
 - Keep calendar construction in a service layer.
 - Reuse singleton-like calendars through `get_default_calendar()` and `get_calendar(name)`.
 - Use `CalendarHoliday` for tenant or organization closed dates without recompiling calendar configs.
+- Use `CalendarDayOverride` when a specific date needs reduced hours, split shifts, or a one-off intraday schedule.
 - Pass aware datetimes from Django models or `django.utils.timezone.now()`.

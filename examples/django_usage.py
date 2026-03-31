@@ -1,6 +1,6 @@
 """Django-oriented example for django-bizcal."""
 
-from django_bizcal.services import get_default_calendar, now
+from django_bizcal.django_api import get_default_calendar, now
 
 
 def main() -> None:
@@ -11,4 +11,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -49,6 +49,7 @@ Included in v1:
 Included in the Django layer:
 
 - `DatabaseHolidayProvider` for persisted holiday dates via Django ORM
+- `DatabaseDayOverrideProvider` for persisted intraday day overrides via Django ORM
 
 This keeps future database-backed providers additive rather than invasive.
 
@@ -67,7 +68,7 @@ Responsibilities:
 - Expose a reusable `AppConfig`
 - Resolve namespaced settings
 - Build and cache the default calendar
-- Resolve named calendars and optionally apply persisted holiday closures
+- Resolve named calendars and optionally apply persisted holiday closures and day overrides
 - Provide helpers that fit typical Django service usage
 
 No domain logic depends on ORM models, request objects, middleware, or settings globals.
@@ -80,10 +81,12 @@ The chosen strategy is:
 
 - Stabilize the pure domain first.
 - Make calendars declarative through `CalendarBuilder.from_dict(...)`.
-- Add only the smallest persistence unit with immediate value: persisted holiday closures keyed by logical calendar name.
+- Add only the smallest persistence units with immediate value:
+  - persisted holiday closures keyed by logical calendar name
+  - persisted per-day override windows keyed by logical calendar name and date
 - Keep weekly schedules and composition declarative rather than ORM-managed for now.
 
-This keeps the library lighter, easier to test, and easier to embed into other Django codebases while still unlocking tenant- or client-specific closed dates.
+This keeps the library lighter, easier to test, and easier to embed into other Django codebases while still unlocking tenant- or client-specific closed dates and one-off special schedules.
 
 ## Timezone strategy
 
@@ -121,6 +124,12 @@ Default Django policy:
 - `OverrideCalendar`: replace the base calendar on specific dates
 
 Overrides are intentionally substitution-based rather than patch-based. A date override replaces the entire day's schedule. This keeps the model easy to reason about and avoids subtle precedence bugs.
+
+The same rule applies in Django persistence:
+
+- `CalendarHoliday` models a closed day
+- `CalendarDayOverride` plus `CalendarDayOverrideWindow` models an explicit replacement schedule
+- persisted day overrides take precedence over persisted holiday closures for the same logical calendar and date
 
 ## Public API strategy
 
