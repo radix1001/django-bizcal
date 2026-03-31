@@ -216,6 +216,8 @@ Cache behavior:
 - `reset_calendar_cache()` clears all named calendar instances
 - `reset_calendar_cache(name)` clears only one named calendar
 - holiday mutation helpers invalidate only the affected logical calendar
+- admin saves and deletes also invalidate the affected logical calendar
+- direct ORM saves and deletes invalidate the affected logical calendar after transaction commit
 
 ### `CalendarDayOverride`
 
@@ -256,6 +258,12 @@ Precedence rules:
 - `CalendarHoliday` closes the whole day
 - `CalendarDayOverride` replaces the whole day with explicit windows
 - if both exist for the same logical calendar and date, the day override wins
+
+Operational behavior:
+
+- admin inline edits for `CalendarDayOverrideWindow` rows are normalized after save
+- adjacent or overlapping persisted windows are compacted into normalized windows
+- direct ORM saves and deletes on override models also invalidate the affected named calendar after transaction commit
 
 ### `list_configured_calendars()`
 

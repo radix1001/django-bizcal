@@ -212,7 +212,7 @@ Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically ap
 - `CalendarDayOverride` replaces the day with one or more explicit intraday windows
 
 If both exist for the same day, the per-day override wins because it is more specific.
-The service helpers also clear only the affected cached named calendar automatically after each change.
+The affected cached named calendar is invalidated automatically after persisted changes, whether they happen through the Django service helpers, the Django admin, or direct ORM saves and deletes after transaction commit.
 
 Preferred Django-specific imports:
 
