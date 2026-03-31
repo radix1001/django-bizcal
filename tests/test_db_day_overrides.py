@@ -7,9 +7,14 @@ import pytest
 from django.contrib import admin
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
+from django.test.utils import CaptureQueriesContext
 
 from django_bizcal.admin import CalendarDayOverrideAdmin
-from django_bizcal.db import DatabaseDayOverrideProvider, apply_database_overrides
+from django_bizcal.db import (
+    DatabaseDayOverrideProvider,
+    DatabaseHolidayProvider,
+    apply_database_overrides,
+)
 from django_bizcal.django_api import (
     CalendarDayOverride,
     CalendarDayOverrideWindow,
@@ -37,7 +42,7 @@ def test_day_override_public_surface_admin_and_migration_are_registered() -> Non
     assert DatabaseDayOverrideProviderFromApi is DatabaseDayOverrideProvider
     assert isinstance(admin.site._registry[CalendarDayOverride], CalendarDayOverrideAdmin)
     executor = MigrationExecutor(connection)
-    assert ("django_bizcal", "0002_day_overrides") in executor.loader.graph.leaf_nodes()
+    assert ("django_bizcal", "0002_day_overrides") in executor.loader.graph.nodes
     table_names = connection.introspection.table_names()
     assert "django_bizcal_calendardayoverride" in table_names
     assert "django_bizcal_calendayoverridewindow" not in table_names
@@ -85,6 +90,46 @@ def test_database_day_override_provider_reads_active_rows_and_normalizes_windows
     assert date(2026, 12, 31) not in provider.overrides
     assert provider.overrides[date(2026, 12, 24)][0].start == time(10, 0)
     assert provider.overrides[date(2026, 12, 24)][0].end == time(14, 0)
+
+
+def test_database_day_override_provider_uses_prefetch_without_n_plus_one_queries() -> None:
+    set_calendar_day_override("support", "2026-12-24", [("09:00", "11:00")])
+    set_calendar_day_override("support", "2026-12-31", [("14:00", "16:00")])
+
+    with CaptureQueriesContext(connection) as queries:
+        provider = DatabaseDayOverrideProvider("support")
+        overrides = provider.overrides
+
+    assert len(queries) == 2
+    assert set(overrides) == {date(2026, 12, 24), date(2026, 12, 31)}
+
+
+def test_public_db_helpers_normalize_calendar_names_consistently() -> None:
+    from django_bizcal import WorkingCalendar
+
+    CalendarHoliday.objects.create(calendar_name="support", day=date(2026, 12, 31))
+    set_calendar_day_override("support", "2026-12-24", [("10:00", "12:00")])
+
+    holiday_provider = DatabaseHolidayProvider(" support ")
+    override_provider = DatabaseDayOverrideProvider(" support ")
+    resolved = apply_database_overrides(
+        WorkingCalendar(
+            tz="UTC",
+            weekly_schedule={3: [("09:00", "18:00")], 4: [("09:00", "18:00")]},
+        ),
+        calendar_name=" support ",
+    )
+
+    assert holiday_provider.is_holiday(date(2026, 12, 31)) is True
+    assert date(2026, 12, 24) in override_provider.overrides
+    assert resolved.business_windows_for_day(date(2026, 12, 24))[0].start == datetime(
+        2026,
+        12,
+        24,
+        10,
+        0,
+        tzinfo=ZoneInfo("UTC"),
+    )
 
 
 def test_apply_database_overrides_gives_day_override_precedence_over_holiday() -> None:

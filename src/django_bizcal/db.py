@@ -7,10 +7,12 @@ from datetime import date
 from functools import cached_property
 from typing import cast
 
+from django.db.models import Prefetch
+
 from .calendars.base import BusinessCalendar
 from .calendars.composite import OverrideCalendar, OverrideInput
 from .exceptions import ValidationError
-from .models import CalendarDayOverride, CalendarHoliday
+from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
 from .windows import TimeWindow, build_time_windows
 
 
@@ -23,8 +25,14 @@ class DatabaseHolidayProvider:
     include_inactive: bool = False
 
     def __post_init__(self) -> None:
-        if not self.calendar_name.strip():
-            raise ValidationError("DatabaseHolidayProvider requires a non-empty calendar_name.")
+        object.__setattr__(
+            self,
+            "calendar_name",
+            _normalize_calendar_name(
+                self.calendar_name,
+                provider_name="DatabaseHolidayProvider",
+            ),
+        )
 
     @cached_property
     def days(self) -> frozenset[date]:
@@ -50,8 +58,14 @@ class DatabaseDayOverrideProvider:
     include_inactive: bool = False
 
     def __post_init__(self) -> None:
-        if not self.calendar_name.strip():
-            raise ValidationError("DatabaseDayOverrideProvider requires a non-empty calendar_name.")
+        object.__setattr__(
+            self,
+            "calendar_name",
+            _normalize_calendar_name(
+                self.calendar_name,
+                provider_name="DatabaseDayOverrideProvider",
+            ),
+        )
 
     @cached_property
     def overrides(self) -> dict[date, tuple[TimeWindow, ...]]:
@@ -59,14 +73,23 @@ class DatabaseDayOverrideProvider:
         queryset = (
             CalendarDayOverride.objects.using(self.using)
             .filter(calendar_name=self.calendar_name)
-            .prefetch_related("windows")
+            .prefetch_related(
+                Prefetch(
+                    "windows",
+                    queryset=CalendarDayOverrideWindow.objects.using(self.using).order_by(
+                        "position",
+                        "start_time",
+                        "end_time",
+                        "pk",
+                    ),
+                )
+            )
         )
         if not self.include_inactive:
             queryset = queryset.filter(is_active=True)
         return {
             override.day: build_time_windows(
-                (window.start_time, window.end_time)
-                for window in override.windows.all().order_by("position", "start_time")
+                (window.start_time, window.end_time) for window in override.windows.all()
             )
             for override in queryset
         }
@@ -118,3 +141,10 @@ def apply_database_overrides(
     if not overrides:
         return calendar
     return OverrideCalendar(calendar, overrides=cast(OverrideInput, overrides), tz=calendar.tz)
+
+
+def _normalize_calendar_name(value: str, *, provider_name: str) -> str:
+    name = str(value).strip()
+    if not name:
+        raise ValidationError(f"{provider_name} requires a non-empty calendar_name.")
+    return name
