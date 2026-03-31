@@ -213,6 +213,7 @@ Once enabled, `get_default_calendar()` and `get_calendar(name)` automatically ap
 
 If both exist for the same day, the per-day override wins because it is more specific.
 The affected cached named calendar is invalidated automatically after persisted changes, whether they happen through the Django service helpers, the Django admin, or direct ORM saves and deletes after transaction commit.
+When the optional models are enabled, the Django admin also includes bulk activate/deactivate actions plus window summaries for one-off intraday schedules.
 
 Preferred Django-specific imports:
 

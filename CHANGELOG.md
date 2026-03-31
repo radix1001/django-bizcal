@@ -5,8 +5,12 @@
 - Added persisted per-day schedule overrides for named Django calendars with the `CalendarDayOverride` and `CalendarDayOverrideWindow` models.
 - Added `DatabaseDayOverrideProvider` and merged runtime application of persisted holiday closures plus per-day intraday overrides.
 - Added Django service helpers for day-override CRUD and sync workflows, including selective cache invalidation for the affected logical calendar.
-- Added admin, migration, and integration coverage for persisted intraday day overrides.
-- Expanded the Django-specific public API and documentation to cover database-backed intraday override workflows.
+- Added automatic named-calendar cache invalidation for persisted changes coming from service helpers, Django admin, and direct ORM saves/deletes after transaction commit.
+- Added admin UX improvements for persisted overrides, including window summaries, date hierarchy, read-only timestamps, and bulk activate/deactivate actions.
+- Added read-oriented Django service helpers for inspecting persisted holiday dates and normalized override windows without traversing ORM relations directly.
+- Fixed review findings in the DB override layer by removing an `N+1` query path, normalizing public provider names consistently, and hardening migration tests against future migrations.
+- Added admin, migration, and integration coverage for persisted intraday day overrides and persistence cache behavior.
+- Expanded the Django-specific public API, examples, and documentation to cover database-backed intraday override workflows and operational behavior.
 
 ## 0.2.1
 

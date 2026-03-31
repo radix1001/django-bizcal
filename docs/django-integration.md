@@ -222,6 +222,7 @@ Cache behavior:
 - holiday mutation helpers invalidate only the affected logical calendar
 - admin saves and deletes also invalidate the affected logical calendar
 - direct ORM saves and deletes invalidate the affected logical calendar after transaction commit
+- the Django admin exposes bulk activate/deactivate actions for holiday rows
 
 ### `CalendarDayOverride`
 
@@ -271,6 +272,7 @@ Operational behavior:
 - admin inline edits for `CalendarDayOverrideWindow` rows are normalized after save
 - adjacent or overlapping persisted windows are compacted into normalized windows
 - direct ORM saves and deletes on override models also invalidate the affected named calendar after transaction commit
+- the Django admin exposes a window summary column plus bulk activate/deactivate actions for day overrides
 
 ### `list_configured_calendars()`
 
