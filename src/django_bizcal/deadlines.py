@@ -69,7 +69,7 @@ def deadline_for(
         service_time=service_time,
         deadline=deadline,
         calendar=calendar,
-        calendar_name=calendar_name,
+        calendar_name=calendar_name or calendar.calendar_name,
     )
 
 

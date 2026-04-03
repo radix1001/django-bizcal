@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.apps import apps
 
-from django_bizcal import WorkingCalendar
+from django_bizcal import WorkingCalendar, deadline_for
 from django_bizcal.exceptions import CalendarConfigurationError
 from django_bizcal.services import (
     build_calendar,
@@ -63,6 +63,11 @@ def test_named_calendar_registry_service_uses_settings(settings) -> None:
     assert isinstance(operations, WorkingCalendar)
     assert support is get_calendar("support")
     assert support.calendar_name == "support"
+    assert deadline_for(
+        datetime(2026, 3, 2, 10, 0, tzinfo=ZoneInfo("UTC")),
+        timedelta(hours=2),
+        calendar=support,
+    ).calendar_name == "support"
     assert support.deadline_for(
         datetime(2026, 3, 2, 10, 0, tzinfo=ZoneInfo("UTC")),
         timedelta(hours=2),

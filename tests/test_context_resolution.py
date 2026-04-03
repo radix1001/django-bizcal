@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from django_bizcal import WorkingCalendar
+from django_bizcal import WorkingCalendar, deadline_for
 from django_bizcal.django_api import CalendarResolution
 from django_bizcal.exceptions import CalendarConfigurationError, ValidationError
 from django_bizcal.services import (
@@ -80,6 +80,11 @@ def test_get_calendar_for_supports_contextual_config_resolution_and_cache(settin
     assert acme_first is acme_second
     assert globex is not acme_first
     assert acme_first.calendar_name == "tenant:acme"
+    assert deadline_for(
+        datetime(2026, 12, 24, 9, 0, tzinfo=ZoneInfo("America/Santiago")),
+        timedelta(hours=1),
+        calendar=acme_first,
+    ).calendar_name == "tenant:acme"
     assert acme_first.deadline_for(
         datetime(2026, 12, 24, 9, 0, tzinfo=ZoneInfo("America/Santiago")),
         timedelta(hours=1),
