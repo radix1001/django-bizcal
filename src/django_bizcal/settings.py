@@ -14,8 +14,9 @@ from django.utils.module_loading import import_string
 
 from .builder import CalendarBuilder
 from .calendars.base import BusinessCalendar
-from .config import CalendarConfig
+from .config import CalendarConfig, DeadlinePolicyConfig
 from .exceptions import CalendarConfigurationError
+from .policies import DeadlinePolicy, DeadlinePolicyBuilder
 from .types import coerce_zoneinfo
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ class BizcalSettings:
     default_calendar_name: str
     default_calendar_config: CalendarConfig
     calendar_configs: dict[str, CalendarConfig]
+    deadline_policy_configs: dict[str, DeadlinePolicyConfig]
     calendar_resolver: CalendarResolver | None
 
     @classmethod
@@ -87,6 +89,9 @@ class BizcalSettings:
             default_config=default_calendar_config,
             default_was_explicit=default_was_explicit,
         )
+        deadline_policy_configs = _resolve_deadline_policy_configs(
+            getattr(django_settings, "BIZCAL_DEADLINE_POLICIES", None)
+        )
         return cls(
             default_timezone=default_timezone,
             default_country=default_country,
@@ -95,6 +100,7 @@ class BizcalSettings:
             default_calendar_name=default_calendar_name,
             default_calendar_config=calendar_configs[default_calendar_name],
             calendar_configs=calendar_configs,
+            deadline_policy_configs=deadline_policy_configs,
             calendar_resolver=calendar_resolver,
         )
 
@@ -137,6 +143,19 @@ class BizcalSettings:
             raise CalendarConfigurationError(
                 f"Unknown calendar {name!r}. Configure it in BIZCAL_CALENDARS "
                 "or BIZCAL_DEFAULT_CALENDAR."
+            ) from exc
+
+    def build_deadline_policy(self, name: str) -> DeadlinePolicy:
+        """Build a configured named deadline policy."""
+        return DeadlinePolicyBuilder.from_dict(self.get_deadline_policy_config(name))
+
+    def get_deadline_policy_config(self, name: str) -> DeadlinePolicyConfig:
+        """Return a configured deadline policy definition by logical name."""
+        try:
+            return self.deadline_policy_configs[name]
+        except KeyError as exc:
+            raise CalendarConfigurationError(
+                f"Unknown deadline policy {name!r}. Configure it in BIZCAL_DEADLINE_POLICIES."
             ) from exc
 
 
@@ -224,3 +243,20 @@ def _resolve_calendar_configs(
         "BIZCAL_DEFAULT_CALENDAR_NAME must reference an entry in BIZCAL_CALENDARS "
         "when BIZCAL_DEFAULT_CALENDAR is not explicitly configured."
     )
+
+
+def _resolve_deadline_policy_configs(configured: Any) -> dict[str, DeadlinePolicyConfig]:
+    if configured is None:
+        return {}
+    if not isinstance(configured, Mapping):
+        raise ValueError(
+            "BIZCAL_DEADLINE_POLICIES must be a mapping of names to policy definitions."
+        )
+
+    policy_configs: dict[str, DeadlinePolicyConfig] = {}
+    for raw_name, raw_config in configured.items():
+        name = _resolve_calendar_name(raw_name)
+        if not isinstance(raw_config, Mapping):
+            raise ValueError(f"BIZCAL_DEADLINE_POLICIES[{name!r}] must be a mapping.")
+        policy_configs[name] = cast(DeadlinePolicyConfig, dict(raw_config))
+    return policy_configs

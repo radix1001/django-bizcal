@@ -18,6 +18,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
 - SLA and due-date helpers built on top of business calendars.
+- Declarative deadline policies for common operational rules and cutoffs.
 - Reusable Django app with namespaced settings and service helpers.
 - Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
 - Context-aware Django calendar resolution for tenant, client, or region specific lookups.
@@ -98,6 +99,57 @@ The same helpers are also available as calendar instance methods:
 target = regional.deadline_for(start, timedelta(hours=8))
 breach_time = regional.breach_at(start, timedelta(hours=8))
 next_cutoff = regional.due_on_next_business_day("2026-03-06", at="closing")
+```
+
+## Declarative deadline policies
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from django_bizcal import DeadlinePolicyBuilder
+
+policy = DeadlinePolicyBuilder.from_dict(
+    {
+        "type": "cutoff",
+        "cutoff": "15:00",
+        "before": {"type": "close_of_business"},
+        "after": {"type": "next_business_day", "at": "closing"},
+    }
+)
+
+deadline = policy.resolve(
+    datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+    calendar=cl,
+)
+
+config = DeadlinePolicyBuilder.to_dict(policy)
+```
+
+Built-in policy types:
+
+- `business_duration`
+- `close_of_business`
+- `same_business_day`
+- `next_business_day`
+- `business_days_at_close`
+- `cutoff`
+
+Policies can also be resolved directly from a calendar instance:
+
+```python
+deadline = cl.resolve_deadline_policy(
+    datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+    policy,
+)
+
+deadline = cl.resolve_deadline_policy_dict(
+    datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+    {
+        "type": "business_duration",
+        "business_hours": 8,
+    },
+)
 ```
 
 ## Django integration
@@ -243,6 +295,23 @@ regional_support = get_calendar_for(region="cl")
 tenant_calendar = get_calendar_for(tenant="acme", region="cl")
 ```
 
+You can also configure named deadline policies in Django settings:
+
+```python
+BIZCAL_DEADLINE_POLICIES = {
+    "support_p1": {
+        "type": "business_duration",
+        "business_hours": 4,
+    },
+    "support_cutoff": {
+        "type": "cutoff",
+        "cutoff": "15:00",
+        "before": {"type": "close_of_business"},
+        "after": {"type": "next_business_day", "at": "closing"},
+    },
+}
+```
+
 And use the same deadline helpers on top of contextual calendars:
 
 ```python
@@ -261,12 +330,33 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = calendar.deadline_for(now(), timedelta(hours=8))
 ```
 
+Or compute deadlines from a named policy:
+
+```python
+from django_bizcal.django_api import (
+    compute_deadline,
+    get_deadline_policy,
+    get_deadline_policy_config,
+)
+
+deadline = compute_deadline(
+    "support_cutoff",
+    now(),
+    tenant="acme",
+    region="cl",
+)
+
+policy = get_deadline_policy("support_cutoff")
+policy_config = get_deadline_policy_config("support_cutoff")
+```
+
 Calendars resolved through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)` also carry their logical `calendar_name`, so `BusinessDeadline.calendar_name` is filled automatically in the common Django flows.
 
 For more complete scenarios, see:
 
 - `examples/sla_deadlines.py`
 - `examples/helpdesk_sla.py`
+- `examples/deadline_policies.py`
 
 Resolver return values can be:
 

@@ -147,6 +147,103 @@ Every `BusinessCalendar` also exposes bound convenience methods:
 
 When a calendar comes from Django service resolution, `calendar.calendar_name` is populated with the logical configured or contextual name, and `calendar.deadline_for(...)` propagates that value into `BusinessDeadline.calendar_name` automatically.
 
+## Deadline policies
+
+The policy layer provides reusable, declarative deadline rules on top of the calendar engine.
+
+Built-in policy types:
+
+- `BusinessDurationPolicy`
+- `CloseOfBusinessPolicy`
+- `SameBusinessDayPolicy`
+- `NextBusinessDayPolicy`
+- `BusinessDaysAtClosePolicy`
+- `CutoffPolicy`
+
+All policies implement the `DeadlinePolicy` protocol:
+
+- `resolve(start, calendar=..., calendar_name=None) -> BusinessDeadline`
+
+### `BusinessDurationPolicy`
+
+Adds a business-time duration to the starting datetime.
+
+### `CloseOfBusinessPolicy`
+
+Resolves to the current business day's closing boundary, rolling forward when the input is already past close or the day is not business-open.
+
+### `NextBusinessDayPolicy`
+
+Resolves to a boundary on the next business day:
+
+- `at="opening"`
+- `at="closing"`
+- `at="HH:MM"` with forward snapping inside the day
+
+### `BusinessDaysAtClosePolicy`
+
+Resolves after a number of business-day closing boundaries.
+
+Parameters:
+
+- `business_days`
+- `include_start`
+- `tz`
+
+### `CutoffPolicy`
+
+Dispatches to `before` or `after` depending on the local wall-clock time of the input datetime.
+
+Example:
+
+```python
+from django_bizcal import DeadlinePolicyBuilder
+
+policy = DeadlinePolicyBuilder.from_dict(
+    {
+        "type": "cutoff",
+        "cutoff": "15:00",
+        "before": {"type": "close_of_business"},
+        "after": {"type": "next_business_day", "at": "closing"},
+    }
+)
+```
+
+### `DeadlinePolicyBuilder.from_dict(...)`
+
+Supported `type` values:
+
+- `business_duration`
+- `close_of_business`
+- `same_business_day`
+- `next_business_day`
+- `business_days_at_close`
+- `cutoff`
+
+Public policy configuration typing is also exported:
+
+- `DeadlinePolicyConfig`
+- `BusinessDurationPolicyConfig`
+- `CloseOfBusinessPolicyConfig`
+- `SameBusinessDayPolicyConfig`
+- `NextBusinessDayPolicyConfig`
+- `BusinessDaysAtClosePolicyConfig`
+- `CutoffPolicyConfig`
+
+### `DeadlinePolicyBuilder.to_dict(...)`
+
+Serializes supported policy objects back into normalized declarative config suitable for:
+
+- Django settings
+- cache payloads
+- fixtures
+- round-trip reconstruction with `DeadlinePolicyBuilder.from_dict(...)`
+
+Every `BusinessCalendar` also exposes bound policy helpers:
+
+- `calendar.resolve_deadline_policy(start, policy, calendar_name=None)`
+- `calendar.resolve_deadline_policy_dict(start, policy_config, calendar_name=None)`
+
 ## Builder
 
 ### `CalendarBuilder.from_dict(...)`
@@ -213,9 +310,14 @@ Stable Django-specific exports include:
 - `apply_database_overrides(...)`
 - `get_default_calendar()`
 - `get_calendar(name)`
+- `get_deadline_policy_config(name)`
+- `get_deadline_policy(name)`
+- `build_deadline_policy(config)`
+- `compute_deadline(policy_name, start, calendar=None, context=None, calendar_name=None, **kwargs)`
 - `resolve_calendar_for(context=None, **kwargs)`
 - `get_calendar_for(context=None, **kwargs)`
 - `list_configured_calendars()`
+- `list_configured_deadline_policies()`
 - `list_calendar_holidays(...)`
 - `list_calendar_holiday_days(...)`
 - `list_calendar_day_overrides(...)`

@@ -26,6 +26,7 @@ Supported settings:
 - `BIZCAL_DEFAULT_CALENDAR`
 - `BIZCAL_CALENDARS`
 - `BIZCAL_CALENDAR_RESOLVER`
+- `BIZCAL_DEADLINE_POLICIES`
 
 ### `BIZCAL_DEFAULT_TIMEZONE`
 
@@ -185,6 +186,29 @@ Guidance:
 - return a config mapping for ad hoc per-context calendars
 - return `CalendarResolution.for_config(..., name=..., cache_key=...)` when you want both persisted override support and contextual memoization
 
+### `BIZCAL_DEADLINE_POLICIES`
+
+Optional mapping of logical policy names to declarative deadline-policy configs.
+
+Example:
+
+```python
+BIZCAL_DEADLINE_POLICIES = {
+    "support_p1": {
+        "type": "business_duration",
+        "business_hours": 4,
+    },
+    "support_cutoff": {
+        "type": "cutoff",
+        "cutoff": "15:00",
+        "before": {"type": "close_of_business"},
+        "after": {"type": "next_business_day", "at": "closing"},
+    },
+}
+```
+
+This enables a lightweight policy layer for recurring operational rules without forcing each Django app to hand-roll deadline logic.
+
 ## Services
 
 Import recommendation:
@@ -249,6 +273,42 @@ Behavior:
 - config resolutions with `name` and `cache_key` participate in persisted holiday and day-override application when `BIZCAL_ENABLE_DB_MODELS=True`
 - duplicate keys between the `context` mapping and `**kwargs` raise a validation error instead of silently overriding values
 
+### `get_deadline_policy(name)`
+
+Build and cache a named deadline policy from `BIZCAL_DEADLINE_POLICIES`.
+
+### `get_deadline_policy_config(name)` and `build_deadline_policy(config)`
+
+Use these helpers when you need:
+
+- the raw declarative policy config from settings
+- to build an ad hoc policy object from a mapping before resolving it manually
+
+### `compute_deadline(policy_name, start, ...)`
+
+Compute a `BusinessDeadline` from a named policy using either:
+
+- an explicit `calendar=...`
+- contextual resolver inputs such as `tenant=...`, `region=...`
+- or the default configured calendar when neither is provided
+
+```python
+from django_bizcal.django_api import compute_deadline
+
+deadline = compute_deadline(
+    "support_cutoff",
+    ticket.created_at,
+    tenant=ticket.tenant,
+    region=ticket.region,
+)
+```
+
+Rules:
+
+- explicit `calendar=...` and contextual resolver inputs cannot be mixed in the same call
+- the resolved calendar's logical `calendar_name` is propagated automatically into the resulting `BusinessDeadline`
+- named deadline policies are cached similarly to named calendars
+
 ### Deadline helpers with Django services
 
 The deadline helpers are part of the stable public API and work naturally with `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`.
@@ -294,6 +354,31 @@ month_end_cutoff = business_deadline_at_close(
     "2026-03-05",
     2,
     calendar=calendar,
+)
+```
+
+For teams that prefer declarative rules over direct helper composition, use named deadline policies instead:
+
+```python
+from django_bizcal.django_api import compute_deadline
+
+deadline = compute_deadline(
+    "support_cutoff",
+    ticket.created_at,
+    tenant=ticket.tenant,
+    region=ticket.region,
+)
+```
+
+Or use a policy directly from a resolved calendar:
+
+```python
+deadline = calendar.resolve_deadline_policy_dict(
+    ticket.created_at,
+    {
+        "type": "business_duration",
+        "business_hours": 4,
+    },
 )
 ```
 

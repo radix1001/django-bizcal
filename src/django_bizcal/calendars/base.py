@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
 from ..exceptions import CalendarRangeError
@@ -23,7 +23,9 @@ from ..types import (
 _SEARCH_HORIZON_DAYS = 3660
 
 if TYPE_CHECKING:
+    from ..config import DeadlinePolicyConfig
     from ..deadlines import BusinessDeadline
+    from ..policies import DeadlinePolicy
 
 
 class BusinessCalendar(ABC):
@@ -302,6 +304,36 @@ class BusinessCalendar(ABC):
         from ..deadlines import breach_at as compute_breach_at
 
         return compute_breach_at(start, service_time, calendar=self)
+
+    def resolve_deadline_policy(
+        self,
+        start: datetime,
+        policy: DeadlinePolicy,
+        *,
+        calendar_name: str | None = None,
+    ) -> BusinessDeadline:
+        """Resolve a deadline policy on this calendar."""
+        return policy.resolve(
+            start,
+            calendar=self,
+            calendar_name=calendar_name or self.calendar_name,
+        )
+
+    def resolve_deadline_policy_dict(
+        self,
+        start: datetime,
+        policy_config: DeadlinePolicyConfig | Mapping[str, Any],
+        *,
+        calendar_name: str | None = None,
+    ) -> BusinessDeadline:
+        """Build and resolve a declarative deadline policy on this calendar."""
+        from ..policies import DeadlinePolicyBuilder
+
+        return DeadlinePolicyBuilder.from_dict(policy_config).resolve(
+            start,
+            calendar=self,
+            calendar_name=calendar_name or self.calendar_name,
+        )
 
     def due_on_next_business_day(
         self,

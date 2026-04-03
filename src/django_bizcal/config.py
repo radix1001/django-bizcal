@@ -72,3 +72,61 @@ CalendarConfig: TypeAlias = (
     | DifferenceCalendarConfig
     | OverrideCalendarConfig
 )
+
+
+class BusinessDurationPolicyConfig(TypedDict):
+    """Declarative config for a business-duration deadline policy."""
+
+    type: Literal["business_duration"]
+    business_hours: NotRequired[int | float]
+    business_minutes: NotRequired[int]
+
+
+class CloseOfBusinessPolicyConfig(TypedDict):
+    """Declarative config for a close-of-business deadline policy."""
+
+    type: Literal["close_of_business"]
+
+
+class NextBusinessDayPolicyConfig(TypedDict):
+    """Declarative config for a next-business-day deadline policy."""
+
+    type: Literal["next_business_day"]
+    at: NotRequired[str]
+    tz: NotRequired[str]
+
+
+class SameBusinessDayPolicyConfig(TypedDict):
+    """Declarative config for a same-business-day deadline policy."""
+
+    type: Literal["same_business_day"]
+    at: NotRequired[str]
+    tz: NotRequired[str]
+
+
+class BusinessDaysAtClosePolicyConfig(TypedDict):
+    """Declarative config for a business-days-at-close deadline policy."""
+
+    type: Literal["business_days_at_close"]
+    business_days: int
+    include_start: NotRequired[bool]
+    tz: NotRequired[str]
+
+
+class CutoffPolicyConfig(TypedDict):
+    """Declarative config for a cutoff-based deadline policy."""
+
+    type: Literal["cutoff"]
+    cutoff: str
+    before: DeadlinePolicyConfig
+    after: DeadlinePolicyConfig
+
+
+DeadlinePolicyConfig: TypeAlias = (
+    BusinessDurationPolicyConfig
+    | CloseOfBusinessPolicyConfig
+    | NextBusinessDayPolicyConfig
+    | SameBusinessDayPolicyConfig
+    | BusinessDaysAtClosePolicyConfig
+    | CutoffPolicyConfig
+)

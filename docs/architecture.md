@@ -29,6 +29,7 @@ Modules:
 - `calendars/composite.py`
 - `builder.py`
 - `deadlines.py`
+- `policies.py`
 
 Responsibilities:
 
@@ -37,6 +38,7 @@ Responsibilities:
 - Represent working calendars and composed calendars.
 - Compute business-time arithmetic and elapsed business time.
 - Provide small application-oriented helpers for SLA clocks and due-date calculation without coupling the core to Django.
+- Provide a declarative policy layer for reusable cutoff and due-date rules without pushing workflow logic into Django settings or ORM models.
 
 ### Holiday providers
 

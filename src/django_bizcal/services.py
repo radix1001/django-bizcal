@@ -13,12 +13,14 @@ from django.db.models import Prefetch
 from django.utils import timezone as django_timezone
 
 from .calendars.base import BusinessCalendar
-from .config import CalendarConfig
+from .config import CalendarConfig, DeadlinePolicyConfig
 from .db import replace_day_override_windows
+from .deadlines import BusinessDeadline
 from .exceptions import CalendarConfigurationError, ValidationError
+from .policies import DeadlinePolicy, DeadlinePolicyBuilder
 from .resolvers import CalendarResolution, normalize_calendar_resolution
 from .settings import get_bizcal_settings
-from .types import DateInput, TimeInput, coerce_date
+from .types import DateInput, TimeInput, coerce_date, ensure_aware
 from .windows import TimeWindow, build_time_windows
 
 if TYPE_CHECKING:
@@ -31,6 +33,7 @@ else:
 _CALENDAR_CACHE: dict[str, BusinessCalendar] = {}
 _CALENDAR_CACHE_LOCK = RLock()
 _CONTEXT_CALENDAR_CACHE: dict[str, _ContextCalendarCacheEntry] = {}
+_DEADLINE_POLICY_CACHE: dict[str, DeadlinePolicy] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +62,62 @@ def get_default_calendar() -> BusinessCalendar:
     """Return the default calendar resolved from Django settings."""
     current_settings = get_bizcal_settings()
     return get_calendar(current_settings.default_calendar_name)
+
+
+def get_deadline_policy(name: str) -> DeadlinePolicy:
+    """Return a configured named deadline policy resolved from Django settings."""
+    normalized_name = _normalize_calendar_name(name)
+    with _CALENDAR_CACHE_LOCK:
+        cached = _DEADLINE_POLICY_CACHE.get(normalized_name)
+        if cached is not None:
+            return cached
+    current_settings = get_bizcal_settings()
+    policy = current_settings.build_deadline_policy(normalized_name)
+    with _CALENDAR_CACHE_LOCK:
+        return _DEADLINE_POLICY_CACHE.setdefault(normalized_name, policy)
+
+
+def get_deadline_policy_config(name: str) -> DeadlinePolicyConfig:
+    """Return a configured named deadline policy definition from Django settings."""
+    return get_bizcal_settings().get_deadline_policy_config(_normalize_calendar_name(name))
+
+
+def build_deadline_policy(
+    config: DeadlinePolicyConfig | Mapping[str, Any],
+) -> DeadlinePolicy:
+    """Build a deadline policy from declarative configuration."""
+    return DeadlinePolicyBuilder.from_dict(config)
+
+
+def compute_deadline(
+    policy_name: str,
+    start: Any,
+    *,
+    calendar: BusinessCalendar | None = None,
+    context: Mapping[str, Any] | None = None,
+    calendar_name: str | None = None,
+    **kwargs: Any,
+) -> BusinessDeadline:
+    """Compute a deadline using a named policy and a resolved calendar."""
+    normalized_start = ensure_aware(start, param_name="start")
+    if calendar is not None and (context is not None or kwargs):
+        raise ValidationError(
+            "compute_deadline accepts either an explicit calendar "
+            "or contextual resolver inputs, not both."
+        )
+    if calendar is None:
+        resolved_calendar = (
+            get_calendar_for(context, **kwargs)
+            if context is not None or kwargs
+            else get_default_calendar()
+        )
+    else:
+        resolved_calendar = calendar
+    return get_deadline_policy(policy_name).resolve(
+        normalized_start,
+        calendar=resolved_calendar,
+        calendar_name=calendar_name or resolved_calendar.calendar_name,
+    )
 
 
 def resolve_calendar_for(
@@ -117,6 +176,11 @@ def now() -> Any:
 def list_configured_calendars() -> tuple[str, ...]:
     """Return configured logical calendar names from settings."""
     return tuple(get_bizcal_settings().calendar_configs)
+
+
+def list_configured_deadline_policies() -> tuple[str, ...]:
+    """Return configured named deadline policies from settings."""
+    return tuple(get_bizcal_settings().deadline_policy_configs)
 
 
 def list_calendar_holidays(
@@ -577,6 +641,7 @@ def reset_calendar_cache(name: str | None = None) -> None:
         if name is None:
             _CALENDAR_CACHE.clear()
             _CONTEXT_CALENDAR_CACHE.clear()
+            _DEADLINE_POLICY_CACHE.clear()
             return
         normalized_name = _normalize_calendar_name(name)
         _CALENDAR_CACHE.pop(normalized_name, None)
