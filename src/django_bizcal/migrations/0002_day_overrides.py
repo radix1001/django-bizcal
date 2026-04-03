@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import django
 from django.db import migrations, models
 from django.db.models import F, Q
+
+_CHECK_CONSTRAINT_ARG = "condition" if django.VERSION >= (5, 1) else "check"
 
 
 class Migration(migrations.Migration):  # type: ignore[misc]
@@ -91,8 +94,10 @@ class Migration(migrations.Migration):  # type: ignore[misc]
         migrations.AddConstraint(
             model_name="calendardayoverridewindow",
             constraint=models.CheckConstraint(
-                condition=Q(end_time__gt=F("start_time")),
-                name="bizcal_day_override_window_start_before_end",
+                **{
+                    _CHECK_CONSTRAINT_ARG: Q(end_time__gt=F("start_time")),
+                    "name": "bizcal_day_override_window_start_before_end",
+                }
             ),
         ),
         migrations.AddConstraint(
