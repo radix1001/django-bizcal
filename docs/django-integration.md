@@ -271,6 +271,19 @@ deadline = calendar.deadline_for(now(), timedelta(hours=8))
 
 For calendars obtained through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`, django-bizcal also attaches the logical `calendar_name` to the calendar instance. As a result, `deadline.calendar_name` is preserved automatically when you call `calendar.deadline_for(...)`.
 
+A realistic helpdesk flow looks like this:
+
+```python
+from datetime import timedelta
+
+from django_bizcal.django_api import get_calendar_for
+
+calendar = get_calendar_for(tenant=ticket.tenant, region=ticket.region)
+deadline = calendar.deadline_for(ticket.created_at, timedelta(hours=8))
+```
+
+See `examples/helpdesk_sla.py` for a fuller example including remaining time and breach checks.
+
 You can also resolve date-based due times directly:
 
 ```python
