@@ -17,6 +17,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Intraday schedules with multiple windows per weekday.
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
+- SLA and due-date helpers built on top of business calendars.
 - Reusable Django app with namespaced settings and service helpers.
 - Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
 - Context-aware Django calendar resolution for tenant, client, or region specific lookups.
@@ -74,6 +75,21 @@ regional = UnionCalendar([cl, mx], tz="UTC")
 start = datetime(2026, 1, 5, 15, 0, tzinfo=ZoneInfo("UTC"))
 deadline = regional.add_business_hours(start, 10)
 elapsed = regional.business_minutes_between(start, deadline)
+```
+
+## Deadline helpers
+
+```python
+from datetime import timedelta
+
+from django_bizcal import breach_at, deadline_for, due_on_next_business_day
+
+target = deadline_for(start, timedelta(hours=8), calendar=regional)
+breach_time = breach_at(start, timedelta(hours=8), calendar=regional)
+next_cutoff = due_on_next_business_day("2026-03-06", calendar=regional, at="closing")
+
+assert target.deadline == breach_time
+assert target.is_breached(at=breach_time) is False
 ```
 
 ## Django integration
@@ -217,6 +233,17 @@ from django_bizcal.django_api import get_calendar_for
 
 regional_support = get_calendar_for(region="cl")
 tenant_calendar = get_calendar_for(tenant="acme", region="cl")
+```
+
+And use the same deadline helpers on top of contextual calendars:
+
+```python
+from datetime import timedelta
+
+from django_bizcal.django_api import deadline_for, get_calendar_for, now
+
+calendar = get_calendar_for(tenant="acme", region="cl")
+deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
 ```
 
 Resolver return values can be:

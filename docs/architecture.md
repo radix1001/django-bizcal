@@ -28,6 +28,7 @@ Modules:
 - `calendars/working.py`
 - `calendars/composite.py`
 - `builder.py`
+- `deadlines.py`
 
 Responsibilities:
 
@@ -35,6 +36,7 @@ Responsibilities:
 - Normalize, merge, intersect, and subtract time windows.
 - Represent working calendars and composed calendars.
 - Compute business-time arithmetic and elapsed business time.
+- Provide small application-oriented helpers for SLA clocks and due-date calculation without coupling the core to Django.
 
 ### Holiday providers
 

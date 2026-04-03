@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django_bizcal import (
     BusinessCalendar,
+    BusinessDeadline,
     BusinessInterval,
     CalendarBuilder,
     CalendarConfig,
@@ -20,11 +21,18 @@ from django_bizcal import (
     UnionCalendarConfig,
     WorkingCalendar,
     WorkingCalendarConfig,
+    breach_at,
+    business_deadline_at_close,
+    deadline_for,
+    due_on_next_business_day,
+    is_breached,
+    remaining_business_time,
 )
 
 
 def test_root_package_exports_public_api_symbols() -> None:
     assert BusinessCalendar is not None
+    assert BusinessDeadline is not None
     assert BusinessInterval is not None
     assert CalendarBuilder is not None
     assert CalendarConfig is not None
@@ -43,3 +51,9 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert UnionCalendarConfig is not None
     assert WorkingCalendar is not None
     assert WorkingCalendarConfig is not None
+    assert breach_at is not None
+    assert business_deadline_at_close is not None
+    assert deadline_for is not None
+    assert due_on_next_business_day is not None
+    assert is_breached is not None
+    assert remaining_business_time is not None

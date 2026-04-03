@@ -2,6 +2,7 @@
 
 from .api import (
     BusinessCalendar,
+    BusinessDeadline,
     BusinessInterval,
     CalendarBuilder,
     CalendarConfig,
@@ -21,10 +22,17 @@ from .api import (
     UnionCalendarConfig,
     WorkingCalendar,
     WorkingCalendarConfig,
+    breach_at,
+    business_deadline_at_close,
+    deadline_for,
+    due_on_next_business_day,
+    is_breached,
+    remaining_business_time,
 )
 
 __all__ = [
     "BusinessCalendar",
+    "BusinessDeadline",
     "BusinessInterval",
     "CalendarBuilder",
     "CalendarConfig",
@@ -44,4 +52,10 @@ __all__ = [
     "UnionCalendarConfig",
     "WorkingCalendar",
     "WorkingCalendarConfig",
+    "breach_at",
+    "business_deadline_at_close",
+    "deadline_for",
+    "due_on_next_business_day",
+    "is_breached",
+    "remaining_business_time",
 ]

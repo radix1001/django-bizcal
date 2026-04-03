@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Added `BusinessDeadline` plus SLA- and due-date helpers such as `deadline_for(...)`, `breach_at(...)`, `remaining_business_time(...)`, `due_on_next_business_day(...)`, and `business_deadline_at_close(...)`.
+- Added stable exports for the deadline helpers from both `django_bizcal` and `django_bizcal.django_api`.
+- Added tests, examples, and documentation for business-deadline workflows on top of named and contextual Django calendars.
+
 ## 0.4.0
 
 - Added contextual Django calendar resolution through `BIZCAL_CALENDAR_RESOLVER`, `CalendarResolution`, `resolve_calendar_for(...)`, and `get_calendar_for(...)`.

@@ -249,6 +249,32 @@ Behavior:
 - config resolutions with `name` and `cache_key` participate in persisted holiday and day-override application when `BIZCAL_ENABLE_DB_MODELS=True`
 - duplicate keys between the `context` mapping and `**kwargs` raise a validation error instead of silently overriding values
 
+### Deadline helpers with Django services
+
+The deadline helpers are part of the stable public API and work naturally with `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`.
+
+```python
+from datetime import timedelta
+
+from django_bizcal.django_api import deadline_for, get_calendar_for, now
+
+calendar = get_calendar_for(tenant="acme", region="cl")
+deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
+```
+
+You can also resolve date-based due times directly:
+
+```python
+from django_bizcal.django_api import business_deadline_at_close, due_on_next_business_day
+
+next_open = due_on_next_business_day("2026-03-06", calendar=calendar)
+month_end_cutoff = business_deadline_at_close(
+    "2026-03-05",
+    2,
+    calendar=calendar,
+)
+```
+
 ### `CalendarHoliday`
 
 Optional Django model for persisted full-day closures keyed by logical calendar name.

@@ -100,6 +100,44 @@ Notes:
 - `next_opening_datetime(...)` and `previous_closing_datetime(...)` return real schedule boundaries, even when the input lies outside business time.
 - `previous_business_datetime(...)` may return the closing boundary of the last open interval when the input is outside business time.
 
+## Deadlines
+
+### `BusinessDeadline`
+
+Represents a computed deadline tied to a concrete `BusinessCalendar`.
+
+Fields:
+
+- `start`
+- `service_time`
+- `deadline`
+- `calendar`
+- `calendar_name`
+
+Helpers:
+
+- `remaining(at=None)`
+- `remaining_minutes(at=None)`
+- `remaining_hours(at=None)`
+- `is_breached(at=None)`
+
+### Deadline functions
+
+- `deadline_for(start, service_time, calendar=...)`
+- `breach_at(start, service_time, calendar=...)`
+- `remaining_business_time(deadline, calendar=None, now=None)`
+- `is_breached(deadline, calendar=None, now=None)`
+- `due_on_next_business_day(day, calendar=..., at="opening"|"closing"|time, tz=None)`
+- `business_deadline_at_close(start_day, business_days, calendar=..., include_start=False, tz=None)`
+
+Semantics:
+
+- `service_time` is expressed as real elapsed business time through `timedelta`
+- `remaining_business_time(...)` is signed: positive before the deadline, negative after breach
+- `due_on_next_business_day(...)` always resolves strictly after the input day
+- when `at` is a wall-clock time between windows, the helper snaps forward to the next interval start on that same business day
+- when `at` is later than the last open interval, the helper clamps to that day's closing boundary
+
 ## Builder
 
 ### `CalendarBuilder.from_dict(...)`

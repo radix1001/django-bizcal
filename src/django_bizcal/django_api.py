@@ -6,6 +6,15 @@ from .db import (
     apply_database_holiday_overrides,
     apply_database_overrides,
 )
+from .deadlines import (
+    BusinessDeadline,
+    breach_at,
+    business_deadline_at_close,
+    deadline_for,
+    due_on_next_business_day,
+    is_breached,
+    remaining_business_time,
+)
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
 from .resolvers import CalendarResolution
 from .services import (
@@ -41,17 +50,22 @@ __all__ = [
     "CalendarDayOverrideWindow",
     "CalendarHoliday",
     "CalendarResolution",
+    "BusinessDeadline",
     "DatabaseDayOverrideProvider",
     "DatabaseHolidayProvider",
     "activate_calendar_day_override",
     "activate_calendar_holiday",
     "apply_database_holiday_overrides",
     "apply_database_overrides",
+    "breach_at",
     "build_calendar",
+    "business_deadline_at_close",
     "deactivate_calendar_day_override",
     "deactivate_calendar_holiday",
+    "deadline_for",
     "delete_calendar_day_override",
     "delete_calendar_holiday",
+    "due_on_next_business_day",
     "get_calendar",
     "get_calendar_for",
     "get_calendar_day_override",
@@ -66,6 +80,8 @@ __all__ = [
     "now",
     "reset_calendar_cache",
     "resolve_calendar_for",
+    "is_breached",
+    "remaining_business_time",
     "set_calendar_day_override",
     "set_calendar_holiday",
     "sync_calendar_day_overrides",
