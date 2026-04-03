@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -62,6 +62,11 @@ def test_named_calendar_registry_service_uses_settings(settings) -> None:
     assert isinstance(support, WorkingCalendar)
     assert isinstance(operations, WorkingCalendar)
     assert support is get_calendar("support")
+    assert support.calendar_name == "support"
+    assert support.deadline_for(
+        datetime(2026, 3, 2, 10, 0, tzinfo=ZoneInfo("UTC")),
+        timedelta(hours=2),
+    ).calendar_name == "support"
     assert list_configured_calendars() == ("support", "operations")
 
 

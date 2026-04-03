@@ -269,6 +269,8 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = calendar.deadline_for(now(), timedelta(hours=8))
 ```
 
+For calendars obtained through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`, django-bizcal also attaches the logical `calendar_name` to the calendar instance. As a result, `deadline.calendar_name` is preserved automatically when you call `calendar.deadline_for(...)`.
+
 You can also resolve date-based due times directly:
 
 ```python

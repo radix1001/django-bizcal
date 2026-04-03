@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -79,6 +79,11 @@ def test_get_calendar_for_supports_contextual_config_resolution_and_cache(settin
 
     assert acme_first is acme_second
     assert globex is not acme_first
+    assert acme_first.calendar_name == "tenant:acme"
+    assert acme_first.deadline_for(
+        datetime(2026, 12, 24, 9, 0, tzinfo=ZoneInfo("America/Santiago")),
+        timedelta(hours=1),
+    ).calendar_name == "tenant:acme"
     assert acme_first.business_windows_for_day(date(2026, 12, 24))[0].start == datetime(
         2026,
         12,

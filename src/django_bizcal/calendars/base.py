@@ -29,15 +29,21 @@ if TYPE_CHECKING:
 class BusinessCalendar(ABC):
     """Abstract calendar returning business intervals in a reference timezone."""
 
-    __slots__ = ("_tz",)
+    __slots__ = ("_tz", "_calendar_name")
 
     def __init__(self, tz: TzInput) -> None:
         self._tz = coerce_zoneinfo(tz)
+        self._calendar_name: str | None = None
 
     @property
     def tz(self) -> ZoneInfo:
         """Reference timezone for the calendar."""
         return self._tz
+
+    @property
+    def calendar_name(self) -> str | None:
+        """Optional logical calendar name, typically attached by Django services."""
+        return self._calendar_name
 
     @abstractmethod
     def _business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
@@ -288,7 +294,7 @@ class BusinessCalendar(ABC):
             start,
             service_time,
             calendar=self,
-            calendar_name=calendar_name,
+            calendar_name=calendar_name or self.calendar_name,
         )
 
     def breach_at(self, start: datetime, service_time: timedelta) -> datetime:

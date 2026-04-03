@@ -47,7 +47,10 @@ def get_calendar(name: str) -> BusinessCalendar:
         if cached is not None:
             return cached
     current_settings = get_bizcal_settings()
-    calendar = current_settings.build_calendar(normalized_name)
+    calendar = _bind_calendar_name(
+        current_settings.build_calendar(normalized_name),
+        normalized_name,
+    )
     with _CALENDAR_CACHE_LOCK:
         return _CALENDAR_CACHE.setdefault(normalized_name, calendar)
 
@@ -612,10 +615,23 @@ def _normalize_context(
 def _build_contextual_calendar(resolution: CalendarResolution) -> BusinessCalendar:
     current_settings = get_bizcal_settings()
     assert resolution.config is not None
-    return current_settings.build_calendar_from_config(
-        resolution.config,
-        calendar_name=resolution.name,
+    return _bind_calendar_name(
+        current_settings.build_calendar_from_config(
+            resolution.config,
+            calendar_name=resolution.name,
+        ),
+        resolution.name,
     )
+
+
+def _bind_calendar_name(
+    calendar: BusinessCalendar,
+    calendar_name: str | None,
+) -> BusinessCalendar:
+    if calendar_name is None:
+        return calendar
+    calendar._calendar_name = _normalize_calendar_name(calendar_name)
+    return calendar
 
 
 def _override_windows(override: CalendarDayOverrideRow) -> tuple[TimeWindow, ...]:

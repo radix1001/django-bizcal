@@ -261,6 +261,8 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = calendar.deadline_for(now(), timedelta(hours=8))
 ```
 
+Calendars resolved through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)` also carry their logical `calendar_name`, so `BusinessDeadline.calendar_name` is filled automatically in the common Django flows.
+
 Resolver return values can be:
 
 - a logical calendar name such as `"support_cl"`

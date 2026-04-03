@@ -145,6 +145,8 @@ Every `BusinessCalendar` also exposes bound convenience methods:
 - `calendar.due_on_next_business_day(day, at="opening"|"closing"|time, tz=None)`
 - `calendar.business_deadline_at_close(start_day, business_days, include_start=False, tz=None)`
 
+When a calendar comes from Django service resolution, `calendar.calendar_name` is populated with the logical configured or contextual name, and `calendar.deadline_for(...)` propagates that value into `BusinessDeadline.calendar_name` automatically.
+
 ## Builder
 
 ### `CalendarBuilder.from_dict(...)`
