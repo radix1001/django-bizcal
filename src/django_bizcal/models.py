@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import django
 from django.db import models
 from django.db.models import F, Q
+
+_CHECK_CONSTRAINT_ARG = "condition" if django.VERSION >= (5, 1) else "check"
 
 
 class CalendarHoliday(models.Model):  # type: ignore[misc]
@@ -96,8 +99,10 @@ class CalendarDayOverrideWindow(models.Model):  # type: ignore[misc]
         verbose_name_plural = "calendar day override windows"
         constraints = [
             models.CheckConstraint(
-                condition=Q(end_time__gt=F("start_time")),
-                name="bizcal_day_override_window_start_before_end",
+                **{
+                    _CHECK_CONSTRAINT_ARG: Q(end_time__gt=F("start_time")),
+                    "name": "bizcal_day_override_window_start_before_end",
+                }
             ),
             models.UniqueConstraint(
                 fields=("override", "position"),
