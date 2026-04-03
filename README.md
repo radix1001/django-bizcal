@@ -92,6 +92,14 @@ assert target.deadline == breach_time
 assert target.is_breached(at=breach_time) is False
 ```
 
+The same helpers are also available as calendar instance methods:
+
+```python
+target = regional.deadline_for(start, timedelta(hours=8))
+breach_time = regional.breach_at(start, timedelta(hours=8))
+next_cutoff = regional.due_on_next_business_day("2026-03-06", at="closing")
+```
+
 ## Django integration
 
 Add the reusable app:
@@ -244,6 +252,13 @@ from django_bizcal.django_api import deadline_for, get_calendar_for, now
 
 calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
+```
+
+Or, more ergonomically:
+
+```python
+calendar = get_calendar_for(tenant="acme", region="cl")
+deadline = calendar.deadline_for(now(), timedelta(hours=8))
 ```
 
 Resolver return values can be:

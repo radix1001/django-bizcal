@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
 from ..exceptions import CalendarRangeError
@@ -12,6 +13,7 @@ from ..intervals import BusinessInterval, normalize_intervals
 from ..types import (
     DateInput,
     RenderTzInput,
+    TimeInput,
     TzInput,
     coerce_date,
     coerce_zoneinfo,
@@ -19,6 +21,9 @@ from ..types import (
 )
 
 _SEARCH_HORIZON_DAYS = 3660
+
+if TYPE_CHECKING:
+    from ..deadlines import BusinessDeadline
 
 
 class BusinessCalendar(ABC):
@@ -268,6 +273,62 @@ class BusinessCalendar(ABC):
     def add_business_minutes(self, start: datetime, minutes: int | float) -> datetime:
         """Add business minutes as real elapsed time."""
         return self.add_business_time(start, timedelta(minutes=minutes))
+
+    def deadline_for(
+        self,
+        start: datetime,
+        service_time: timedelta,
+        *,
+        calendar_name: str | None = None,
+    ) -> BusinessDeadline:
+        """Compute a business deadline tied to this calendar."""
+        from ..deadlines import deadline_for as compute_deadline_for
+
+        return compute_deadline_for(
+            start,
+            service_time,
+            calendar=self,
+            calendar_name=calendar_name,
+        )
+
+    def breach_at(self, start: datetime, service_time: timedelta) -> datetime:
+        """Return the breach datetime for a business-time target on this calendar."""
+        from ..deadlines import breach_at as compute_breach_at
+
+        return compute_breach_at(start, service_time, calendar=self)
+
+    def due_on_next_business_day(
+        self,
+        day: DateInput,
+        *,
+        at: str | TimeInput = "opening",
+        tz: RenderTzInput | None = None,
+    ) -> datetime:
+        """Return a due datetime on the next business day for this calendar."""
+        from ..deadlines import due_on_next_business_day as compute_due_on_next_business_day
+
+        return compute_due_on_next_business_day(day, calendar=self, at=at, tz=tz)
+
+    def business_deadline_at_close(
+        self,
+        start_day: DateInput,
+        business_days: int,
+        *,
+        include_start: bool = False,
+        tz: RenderTzInput | None = None,
+    ) -> datetime:
+        """Return the closing boundary after a number of business days on this calendar."""
+        from ..deadlines import (
+            business_deadline_at_close as compute_business_deadline_at_close,
+        )
+
+        return compute_business_deadline_at_close(
+            start_day,
+            business_days,
+            calendar=self,
+            include_start=include_start,
+            tz=tz,
+        )
 
     def business_time_between(self, start: datetime, end: datetime) -> timedelta:
         """Return the real business time elapsed between two aware datetimes."""

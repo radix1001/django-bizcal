@@ -262,6 +262,13 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
 ```
 
+Because deadline helpers are also available as `BusinessCalendar` instance methods, this is often the cleanest style in Django code:
+
+```python
+calendar = get_calendar_for(tenant="acme", region="cl")
+deadline = calendar.deadline_for(now(), timedelta(hours=8))
+```
+
 You can also resolve date-based due times directly:
 
 ```python

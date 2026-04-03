@@ -32,6 +32,8 @@ def test_deadline_for_returns_business_deadline(support_calendar: WorkingCalenda
     assert isinstance(deadline, BusinessDeadline)
     assert deadline.deadline == datetime(2026, 3, 2, 15, 0, tzinfo=tz)
     assert deadline.calendar_name == "support"
+    assert support_calendar.deadline_for(start, timedelta(hours=4)).deadline == deadline.deadline
+    assert support_calendar.breach_at(start, timedelta(hours=4)) == deadline.deadline
 
 
 def test_breach_helpers_report_remaining_and_overdue_business_time(
@@ -107,6 +109,14 @@ def test_due_on_next_business_day_supports_boundaries_and_snaps(
         calendar=support_calendar,
         at="20:00",
     ) == datetime(2026, 3, 9, 18, 0, tzinfo=tz)
+    assert support_calendar.due_on_next_business_day("2026-03-06", at="closing") == datetime(
+        2026,
+        3,
+        9,
+        18,
+        0,
+        tzinfo=tz,
+    )
 
 
 def test_due_on_next_business_day_can_render_in_another_timezone(
@@ -143,6 +153,14 @@ def test_business_deadline_at_close_counts_business_days(
         calendar=support_calendar,
         include_start=True,
     ) == datetime(2026, 3, 9, 18, 0, tzinfo=tz)
+    assert support_calendar.business_deadline_at_close("2026-03-05", 2) == datetime(
+        2026,
+        3,
+        9,
+        18,
+        0,
+        tzinfo=tz,
+    )
 
 
 def test_deadline_helpers_validate_inputs(support_calendar: WorkingCalendar) -> None:

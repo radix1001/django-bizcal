@@ -138,6 +138,13 @@ Semantics:
 - when `at` is a wall-clock time between windows, the helper snaps forward to the next interval start on that same business day
 - when `at` is later than the last open interval, the helper clamps to that day's closing boundary
 
+Every `BusinessCalendar` also exposes bound convenience methods:
+
+- `calendar.deadline_for(start, service_time, calendar_name=None)`
+- `calendar.breach_at(start, service_time)`
+- `calendar.due_on_next_business_day(day, at="opening"|"closing"|time, tz=None)`
+- `calendar.business_deadline_at_close(start_day, business_days, include_start=False, tz=None)`
+
 ## Builder
 
 ### `CalendarBuilder.from_dict(...)`
