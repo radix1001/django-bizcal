@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Added a declarative deadline-policy layer with `BusinessDurationPolicy`, `CloseOfBusinessPolicy`, `NextBusinessDayPolicy`, `BusinessDaysAtClosePolicy`, `CutoffPolicy`, and `SameBusinessDayPolicy`.
+- Added `DeadlinePolicyBuilder.from_dict(...)` and `DeadlinePolicyBuilder.to_dict(...)` for typed, serializable deadline-policy configuration.
+- Added calendar-bound helpers such as `resolve_deadline_policy(...)` and `resolve_deadline_policy_dict(...)` so business calendars can evaluate policies directly.
+- Added Django settings and services for named deadline policies via `BIZCAL_DEADLINE_POLICIES`, `get_deadline_policy(...)`, `get_deadline_policy_config(...)`, `build_deadline_policy(...)`, `list_configured_deadline_policies(...)`, and `compute_deadline(...)`.
+- Expanded the stable public API, test suite, examples, and documentation to cover declarative deadline policies for named and contextual Django calendars.
+
 ## 0.5.0
 
 - Added `BusinessDeadline` plus SLA- and due-date helpers such as `deadline_for(...)`, `breach_at(...)`, `remaining_business_time(...)`, `due_on_next_business_day(...)`, and `business_deadline_at_close(...)`.
