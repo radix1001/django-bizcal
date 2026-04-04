@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django_bizcal.django_api import (
     BusinessDaysAtClosePolicy,
+    BusinessDaysPolicy,
     BusinessDeadline,
     BusinessDurationPolicy,
     CalendarDayOverride,
@@ -59,6 +60,7 @@ from django_bizcal.django_api import (
 
 def test_django_api_exports_stable_helpers() -> None:
     assert BusinessDaysAtClosePolicy is not None
+    assert BusinessDaysPolicy is not None
     assert BusinessDeadline is not None
     assert BusinessDurationPolicy is not None
     assert CalendarDayOverride is not None

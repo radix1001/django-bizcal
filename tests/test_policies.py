@@ -7,6 +7,7 @@ import pytest
 
 from django_bizcal import (
     BusinessDaysAtClosePolicy,
+    BusinessDaysPolicy,
     BusinessDurationPolicy,
     CloseOfBusinessPolicy,
     CutoffPolicy,
@@ -106,6 +107,52 @@ def test_next_business_day_and_business_days_at_close_policies(
     )
 
 
+def test_business_days_policy_supports_fixed_time_boundaries(
+    support_calendar: WorkingCalendar,
+) -> None:
+    same_day_counts = BusinessDaysPolicy(business_days=2, at="13:30", include_start=True).resolve(
+        datetime(2026, 3, 5, 10, 0, tzinfo=ZoneInfo("America/Santiago")),
+        calendar=support_calendar,
+    )
+    passed_boundary_rolls = BusinessDaysPolicy(
+        business_days=2,
+        at="13:30",
+        include_start=True,
+    ).resolve(
+        datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+        calendar=support_calendar,
+    )
+    next_opening = BusinessDaysPolicy(business_days=1, at="opening").resolve(
+        datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+        calendar=support_calendar,
+    )
+
+    assert same_day_counts.deadline == datetime(
+        2026,
+        3,
+        6,
+        14,
+        0,
+        tzinfo=ZoneInfo("America/Santiago"),
+    )
+    assert passed_boundary_rolls.deadline == datetime(
+        2026,
+        3,
+        9,
+        14,
+        0,
+        tzinfo=ZoneInfo("America/Santiago"),
+    )
+    assert next_opening.deadline == datetime(
+        2026,
+        3,
+        6,
+        9,
+        0,
+        tzinfo=ZoneInfo("America/Santiago"),
+    )
+
+
 def test_same_business_day_policy_resolves_same_day_or_rolls_forward(
     support_calendar: WorkingCalendar,
 ) -> None:
@@ -175,7 +222,7 @@ def test_cutoff_policy_dispatches_between_nested_policies(
 def test_deadline_policy_builder_supports_supported_policy_types(
     support_calendar: WorkingCalendar,
 ) -> None:
-    config = {
+    cutoff_config = {
         "type": "cutoff",
         "cutoff": "15:00",
         "before": {"type": "close_of_business"},
@@ -184,10 +231,21 @@ def test_deadline_policy_builder_supports_supported_policy_types(
             "business_hours": 8,
         },
     }
-    policy = DeadlinePolicyBuilder.from_dict(config)
+    business_days_config = {
+        "type": "business_days",
+        "business_days": 2,
+        "at": "13:30",
+        "include_start": True,
+    }
+    policy = DeadlinePolicyBuilder.from_dict(cutoff_config)
+    business_days_policy = DeadlinePolicyBuilder.from_dict(business_days_config)
 
     deadline = policy.resolve(
         datetime(2026, 3, 5, 16, 0, tzinfo=ZoneInfo("America/Santiago")),
+        calendar=support_calendar,
+    )
+    business_days_deadline = business_days_policy.resolve(
+        datetime(2026, 3, 5, 10, 0, tzinfo=ZoneInfo("America/Santiago")),
         calendar=support_calendar,
     )
 
@@ -199,7 +257,16 @@ def test_deadline_policy_builder_supports_supported_policy_types(
         0,
         tzinfo=ZoneInfo("America/Santiago"),
     )
-    assert DeadlinePolicyBuilder.to_dict(policy) == config
+    assert business_days_deadline.deadline == datetime(
+        2026,
+        3,
+        6,
+        14,
+        0,
+        tzinfo=ZoneInfo("America/Santiago"),
+    )
+    assert DeadlinePolicyBuilder.to_dict(policy) == cutoff_config
+    assert DeadlinePolicyBuilder.to_dict(business_days_policy) == business_days_config
     assert DeadlinePolicyBuilder.to_dict(SameBusinessDayPolicy(at="15:30")) == {
         "type": "same_business_day",
         "at": "15:30",
@@ -243,8 +310,29 @@ def test_deadline_policy_builder_validates_invalid_configs() -> None:
     with pytest.raises(ValidationError):
         DeadlinePolicyBuilder.from_dict({"type": "business_duration"})
     with pytest.raises(ValidationError):
+        DeadlinePolicyBuilder.from_dict(
+            {
+                "type": "business_duration",
+                "business_hours": -1,
+                "business_minutes": 120,
+            }
+        )
+    with pytest.raises(ValidationError):
+        DeadlinePolicyBuilder.from_dict({"type": "business_days"})
+    with pytest.raises(ValidationError):
         DeadlinePolicyBuilder.from_dict({"type": "business_days_at_close"})
     with pytest.raises(ValidationError):
         DeadlinePolicyBuilder.from_dict({"type": "cutoff", "cutoff": "15:00"})
+    with pytest.raises(ValidationError):
+        DeadlinePolicyBuilder.from_dict(
+            {
+                "type": "cutoff",
+                "cutoff": "15:00",
+                "before": "close_of_business",
+                "after": {"type": "next_business_day"},
+            }
+        )
+    with pytest.raises(ValidationError):
+        BusinessDaysPolicy(business_days=0)
     with pytest.raises(ValidationError):
         BusinessDaysAtClosePolicy(business_days=0)

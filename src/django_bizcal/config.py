@@ -96,6 +96,16 @@ class NextBusinessDayPolicyConfig(TypedDict):
     tz: NotRequired[str]
 
 
+class BusinessDaysPolicyConfig(TypedDict):
+    """Declarative config for a business-days deadline policy."""
+
+    type: Literal["business_days"]
+    business_days: int
+    at: NotRequired[str]
+    include_start: NotRequired[bool]
+    tz: NotRequired[str]
+
+
 class SameBusinessDayPolicyConfig(TypedDict):
     """Declarative config for a same-business-day deadline policy."""
 
@@ -126,6 +136,7 @@ DeadlinePolicyConfig: TypeAlias = (
     BusinessDurationPolicyConfig
     | CloseOfBusinessPolicyConfig
     | NextBusinessDayPolicyConfig
+    | BusinessDaysPolicyConfig
     | SameBusinessDayPolicyConfig
     | BusinessDaysAtClosePolicyConfig
     | CutoffPolicyConfig

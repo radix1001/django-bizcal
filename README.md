@@ -130,6 +130,7 @@ Built-in policy types:
 
 - `business_duration`
 - `close_of_business`
+- `business_days`
 - `same_business_day`
 - `next_business_day`
 - `business_days_at_close`
@@ -302,6 +303,12 @@ BIZCAL_DEADLINE_POLICIES = {
     "support_p1": {
         "type": "business_duration",
         "business_hours": 4,
+    },
+    "vendor_follow_up": {
+        "type": "business_days",
+        "business_days": 2,
+        "at": "13:30",
+        "include_start": True,
     },
     "support_cutoff": {
         "type": "cutoff",

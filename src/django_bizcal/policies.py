@@ -10,6 +10,7 @@ from typing import Any, Protocol, cast
 from .calendars.base import BusinessCalendar
 from .config import (
     BusinessDaysAtClosePolicyConfig,
+    BusinessDaysPolicyConfig,
     BusinessDurationPolicyConfig,
     CloseOfBusinessPolicyConfig,
     CutoffPolicyConfig,
@@ -135,6 +136,39 @@ class NextBusinessDayPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class BusinessDaysPolicy:
+    """Policy that resolves after a number of business-day boundaries."""
+
+    business_days: int
+    at: str | TimeInput = "closing"
+    include_start: bool = False
+    tz: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.business_days <= 0:
+            raise ValidationError("business_days must be a positive integer.")
+        if self.at not in {"opening", "closing"}:
+            object.__setattr__(self, "at", coerce_time(self.at))
+
+    def resolve(
+        self,
+        start: datetime,
+        *,
+        calendar: BusinessCalendar,
+        calendar_name: str | None = None,
+    ) -> BusinessDeadline:
+        return _resolve_business_day_boundary_policy(
+            start,
+            calendar=calendar,
+            calendar_name=calendar_name,
+            business_days=self.business_days,
+            at=self.at,
+            include_start=self.include_start,
+            tz=self.tz,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class SameBusinessDayPolicy:
     """Policy that resolves on the current business day, else rolls to the next one."""
 
@@ -196,29 +230,14 @@ class BusinessDaysAtClosePolicy:
         calendar: BusinessCalendar,
         calendar_name: str | None = None,
     ) -> BusinessDeadline:
-        normalized_start = ensure_aware(start, param_name="start")
-        local_day = _coerce_local_day(normalized_start, calendar)
-        remaining_boundaries = self.business_days
-        search_from = local_day if self.include_start else local_day + timedelta(days=1)
-
-        while True:
-            target_day = calendar.next_business_day(search_from)
-            resolved_deadline = _resolve_day_deadline(
-                target_day,
-                calendar=calendar,
-                at="closing",
-                tz=self.tz,
-            )
-            if resolved_deadline >= normalized_start:
-                remaining_boundaries -= 1
-                if remaining_boundaries == 0:
-                    break
-            search_from = target_day + timedelta(days=1)
-        return _build_policy_deadline(
-            normalized_start,
-            resolved_deadline,
+        return _resolve_business_day_boundary_policy(
+            start,
             calendar=calendar,
             calendar_name=calendar_name,
+            business_days=self.business_days,
+            at="closing",
+            include_start=self.include_start,
+            tz=self.tz,
         )
 
 
@@ -278,6 +297,15 @@ class DeadlinePolicyBuilder:
                 at=cast(str, raw_config.get("at", "opening")),
                 tz=cast(str | None, raw_config.get("tz")),
             )
+        if policy_type == "business_days":
+            if "business_days" not in raw_config:
+                raise ValidationError("business_days policy requires business_days.")
+            return BusinessDaysPolicy(
+                business_days=int(raw_config["business_days"]),
+                at=cast(str | TimeInput, raw_config.get("at", "closing")),
+                include_start=bool(raw_config.get("include_start", False)),
+                tz=cast(str | None, raw_config.get("tz")),
+            )
         if policy_type == "same_business_day":
             return SameBusinessDayPolicy(
                 at=cast(str, raw_config.get("at", "closing")),
@@ -302,10 +330,16 @@ class DeadlinePolicyBuilder:
                 raise ValidationError(
                     "cutoff policy requires cutoff, before, and after."
                 )
+            before = raw_config["before"]
+            after = raw_config["after"]
+            if not isinstance(before, Mapping):
+                raise ValidationError("cutoff policy requires before to be a mapping.")
+            if not isinstance(after, Mapping):
+                raise ValidationError("cutoff policy requires after to be a mapping.")
             return CutoffPolicy(
                 cutoff=cast(TimeInput, raw_config["cutoff"]),
-                before=cls.from_dict(cast(Mapping[str, Any], raw_config["before"])),
-                after=cls.from_dict(cast(Mapping[str, Any], raw_config["after"])),
+                before=cls.from_dict(cast(Mapping[str, Any], before)),
+                after=cls.from_dict(cast(Mapping[str, Any], after)),
             )
         raise ValidationError(f"Unsupported deadline policy type: {policy_type!r}.")
 
@@ -324,6 +358,17 @@ class DeadlinePolicyBuilder:
             if policy.tz is not None:
                 next_config["tz"] = policy.tz
             return next_config
+        if isinstance(policy, BusinessDaysPolicy):
+            business_days_config: BusinessDaysPolicyConfig = {
+                "type": "business_days",
+                "business_days": policy.business_days,
+                "at": _serialize_boundary(policy.at),
+            }
+            if policy.include_start:
+                business_days_config["include_start"] = True
+            if policy.tz is not None:
+                business_days_config["tz"] = policy.tz
+            return business_days_config
         if isinstance(policy, SameBusinessDayPolicy):
             same_day_config: SameBusinessDayPolicyConfig = {
                 "type": "same_business_day",
@@ -359,11 +404,17 @@ class DeadlinePolicyBuilder:
             raise ValidationError(
                 "business_duration policy requires business_hours or business_minutes."
             )
+        hours_value = float(config["business_hours"]) if "business_hours" in config else 0.0
+        minutes_value = int(config["business_minutes"]) if "business_minutes" in config else 0
+        if hours_value < 0:
+            raise ValidationError("business_hours must not be negative.")
+        if minutes_value < 0:
+            raise ValidationError("business_minutes must not be negative.")
         service_time = timedelta()
         if "business_hours" in config:
-            service_time += timedelta(hours=float(config["business_hours"]))
+            service_time += timedelta(hours=hours_value)
         if "business_minutes" in config:
-            service_time += timedelta(minutes=int(config["business_minutes"]))
+            service_time += timedelta(minutes=minutes_value)
         return BusinessDurationPolicy(service_time=service_time)
 
     @staticmethod
@@ -403,6 +454,41 @@ def _build_policy_deadline(
         calendar=calendar,
         calendar_name=calendar_name or calendar.calendar_name,
     )
+
+
+def _resolve_business_day_boundary_policy(
+    start: datetime,
+    *,
+    calendar: BusinessCalendar,
+    calendar_name: str | None,
+    business_days: int,
+    at: str | TimeInput,
+    include_start: bool,
+    tz: str | None,
+) -> BusinessDeadline:
+    normalized_start = ensure_aware(start, param_name="start")
+    local_day = _coerce_local_day(normalized_start, calendar)
+    remaining_boundaries = business_days
+    search_from = local_day if include_start else local_day + timedelta(days=1)
+
+    while True:
+        target_day = calendar.next_business_day(search_from)
+        resolved_deadline = _resolve_day_deadline(
+            target_day,
+            calendar=calendar,
+            at=at,
+            tz=tz,
+        )
+        if resolved_deadline >= normalized_start:
+            remaining_boundaries -= 1
+            if remaining_boundaries == 0:
+                return _build_policy_deadline(
+                    normalized_start,
+                    resolved_deadline,
+                    calendar=calendar,
+                    calendar_name=calendar_name,
+                )
+        search_from = target_day + timedelta(days=1)
 
 
 def _serialize_boundary(value: str | TimeInput) -> str:

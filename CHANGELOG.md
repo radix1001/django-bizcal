@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- Added `BusinessDaysPolicy` so declarative deadline rules can target the opening, closing, or a fixed snapped wall-clock time after an arbitrary number of business-day boundaries.
+- Kept `BusinessDaysAtClosePolicy` fully backward compatible while reusing the same internal boundary-counting semantics as the new generalized policy.
+- Hardened deadline-policy validation by rejecting negative mixed duration components and by validating that cutoff branches are declarative policy mappings.
+- Expanded the stable public API exports, Django integration coverage, documentation, and examples for the generalized business-days policy.
+- Updated the architecture guide to reflect the stable public API surface that now includes deadline helpers and declarative policy types.
+
 ## 0.6.0
 
 - Added a declarative deadline-policy layer with `BusinessDurationPolicy`, `CloseOfBusinessPolicy`, `NextBusinessDayPolicy`, `BusinessDaysAtClosePolicy`, `CutoffPolicy`, and `SameBusinessDayPolicy`.

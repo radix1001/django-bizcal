@@ -18,6 +18,7 @@ from .deadlines import (
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
 from .policies import (
     BusinessDaysAtClosePolicy,
+    BusinessDaysPolicy,
     BusinessDurationPolicy,
     CloseOfBusinessPolicy,
     CutoffPolicy,
@@ -66,6 +67,7 @@ __all__ = [
     "CalendarHoliday",
     "CalendarResolution",
     "BusinessDaysAtClosePolicy",
+    "BusinessDaysPolicy",
     "BusinessDeadline",
     "BusinessDurationPolicy",
     "CloseOfBusinessPolicy",

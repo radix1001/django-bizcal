@@ -198,6 +198,12 @@ BIZCAL_DEADLINE_POLICIES = {
         "type": "business_duration",
         "business_hours": 4,
     },
+    "vendor_follow_up": {
+        "type": "business_days",
+        "business_days": 2,
+        "at": "13:30",
+        "include_start": True,
+    },
     "support_cutoff": {
         "type": "cutoff",
         "cutoff": "15:00",
@@ -376,8 +382,10 @@ Or use a policy directly from a resolved calendar:
 deadline = calendar.resolve_deadline_policy_dict(
     ticket.created_at,
     {
-        "type": "business_duration",
-        "business_hours": 4,
+        "type": "business_days",
+        "business_days": 2,
+        "at": "13:30",
+        "include_start": True,
     },
 )
 ```

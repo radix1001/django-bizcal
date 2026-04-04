@@ -11,6 +11,7 @@ from .calendars.composite import (
 from .calendars.working import WorkingCalendar
 from .config import (
     BusinessDaysAtClosePolicyConfig,
+    BusinessDaysPolicyConfig,
     BusinessDurationPolicyConfig,
     CalendarConfig,
     CloseOfBusinessPolicyConfig,
@@ -36,6 +37,7 @@ from .deadlines import (
 from .intervals import BusinessInterval
 from .policies import (
     BusinessDaysAtClosePolicy,
+    BusinessDaysPolicy,
     BusinessDurationPolicy,
     CloseOfBusinessPolicy,
     CutoffPolicy,
@@ -52,6 +54,8 @@ __all__ = [
     "BusinessCalendar",
     "BusinessDaysAtClosePolicy",
     "BusinessDaysAtClosePolicyConfig",
+    "BusinessDaysPolicy",
+    "BusinessDaysPolicyConfig",
     "BusinessDeadline",
     "BusinessDurationPolicy",
     "BusinessDurationPolicyConfig",

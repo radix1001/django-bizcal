@@ -155,6 +155,7 @@ Built-in policy types:
 
 - `BusinessDurationPolicy`
 - `CloseOfBusinessPolicy`
+- `BusinessDaysPolicy`
 - `SameBusinessDayPolicy`
 - `NextBusinessDayPolicy`
 - `BusinessDaysAtClosePolicy`
@@ -180,9 +181,25 @@ Resolves to a boundary on the next business day:
 - `at="closing"`
 - `at="HH:MM"` with forward snapping inside the day
 
+### `BusinessDaysPolicy`
+
+Resolves after a number of business-day boundaries using:
+
+- `at="opening"`
+- `at="closing"`
+- `at="HH:MM"` with forward snapping inside the day
+
+Parameters:
+
+- `business_days`
+- `at`
+- `include_start`
+- `tz`
+
 ### `BusinessDaysAtClosePolicy`
 
-Resolves after a number of business-day closing boundaries.
+Compatibility convenience policy that resolves after a number of business-day
+closing boundaries.
 
 Parameters:
 
@@ -215,6 +232,7 @@ Supported `type` values:
 
 - `business_duration`
 - `close_of_business`
+- `business_days`
 - `same_business_day`
 - `next_business_day`
 - `business_days_at_close`
@@ -225,6 +243,7 @@ Public policy configuration typing is also exported:
 - `DeadlinePolicyConfig`
 - `BusinessDurationPolicyConfig`
 - `CloseOfBusinessPolicyConfig`
+- `BusinessDaysPolicyConfig`
 - `SameBusinessDayPolicyConfig`
 - `NextBusinessDayPolicyConfig`
 - `BusinessDaysAtClosePolicyConfig`

@@ -152,5 +152,13 @@ Stable v1 public imports are exposed from `django_bizcal`:
 - `CalendarBuilder`
 - `BusinessCalendar`
 - `HolidayProvider`
+- deadline helpers such as `deadline_for(...)` and `due_on_next_business_day(...)`
+- policy types such as `BusinessDurationPolicy`, `BusinessDaysPolicy`, and `CutoffPolicy`
 
-Supporting modules remain importable, but only this root-level surface is considered the stable API contract.
+Stable Django-specific imports are exposed from `django_bizcal.django_api` for:
+
+- calendar service resolution
+- optional persistence helpers and models
+- deadline-policy lookup and execution
+
+Supporting modules remain importable, but these package-level surfaces are the stable API contract.

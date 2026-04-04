@@ -4,6 +4,8 @@ from django_bizcal import (
     BusinessCalendar,
     BusinessDaysAtClosePolicy,
     BusinessDaysAtClosePolicyConfig,
+    BusinessDaysPolicy,
+    BusinessDaysPolicyConfig,
     BusinessDeadline,
     BusinessDurationPolicy,
     BusinessDurationPolicyConfig,
@@ -49,6 +51,8 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert BusinessCalendar is not None
     assert BusinessDaysAtClosePolicy is not None
     assert BusinessDaysAtClosePolicyConfig is not None
+    assert BusinessDaysPolicy is not None
+    assert BusinessDaysPolicyConfig is not None
     assert BusinessDeadline is not None
     assert BusinessDurationPolicy is not None
     assert BusinessDurationPolicyConfig is not None

@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from django_bizcal.django_api import (
+    BusinessDaysPolicy,
     BusinessDurationPolicy,
     build_deadline_policy,
     compute_deadline,
@@ -52,6 +53,48 @@ def test_django_services_expose_named_deadline_policies(settings) -> None:
         build_deadline_policy({"type": "business_duration", "business_minutes": 90}),
         BusinessDurationPolicy,
     )
+
+
+def test_django_services_support_general_business_days_policy(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {
+                "0": [["09:00", "18:00"]],
+                "1": [["09:00", "18:00"]],
+                "2": [["09:00", "18:00"]],
+                "3": [["09:00", "18:00"]],
+                "4": [["09:00", "18:00"]],
+            },
+        }
+    }
+    settings.BIZCAL_DEADLINE_POLICIES = {
+        "vendor_follow_up": {
+            "type": "business_days",
+            "business_days": 2,
+            "at": "13:30",
+            "include_start": True,
+        }
+    }
+    reset_calendar_cache()
+
+    policy = get_deadline_policy("vendor_follow_up")
+    deadline = compute_deadline(
+        "vendor_follow_up",
+        datetime(2026, 3, 5, 10, 0, tzinfo=ZoneInfo("UTC")),
+    )
+
+    assert isinstance(policy, BusinessDaysPolicy)
+    assert deadline.deadline == datetime(2026, 3, 6, 13, 30, tzinfo=ZoneInfo("UTC"))
+    assert get_deadline_policy_config("vendor_follow_up") == {
+        "type": "business_days",
+        "business_days": 2,
+        "at": "13:30",
+        "include_start": True,
+    }
 
 
 def test_compute_deadline_supports_contextual_calendar_resolution(settings) -> None:
