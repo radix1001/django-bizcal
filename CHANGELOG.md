@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+
+- Added bounded per-instance memoization of local business windows so repeated day, range, and business-time queries reuse previously computed intervals without changing calendar semantics.
+- Cached resolved Django settings process-locally to reduce repeated settings normalization and import-string resolution in hot service paths.
+- Kept cache invalidation backward compatible by clearing the settings snapshot during global `reset_calendar_cache()` and `reset_deadline_policy_cache()` calls.
+- Hardened the public API contract with exact export-surface tests for both `django_bizcal` and `django_bizcal.django_api`.
+- Added production and upgrade documentation covering cache behavior, resolver design, operational limits, and upgrade notes from `0.7.0` through `0.9.0`.
+
 ## 0.8.0
 
 - Added contextual deadline-policy resolution for Django through `BIZCAL_DEADLINE_POLICY_RESOLVER`, `DeadlinePolicyResolution`, `resolve_deadline_policy_for(...)`, and `get_deadline_policy_for(...)`.

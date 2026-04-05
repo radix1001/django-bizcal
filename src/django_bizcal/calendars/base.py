@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from typing import TYPE_CHECKING, Any
@@ -21,6 +22,7 @@ from ..types import (
 )
 
 _SEARCH_HORIZON_DAYS = 3660
+_LOCAL_DAY_WINDOW_CACHE_SIZE = 512
 
 if TYPE_CHECKING:
     from ..config import DeadlinePolicyConfig
@@ -31,11 +33,14 @@ if TYPE_CHECKING:
 class BusinessCalendar(ABC):
     """Abstract calendar returning business intervals in a reference timezone."""
 
-    __slots__ = ("_tz", "_calendar_name")
+    __slots__ = ("_tz", "_calendar_name", "_local_day_window_cache")
 
     def __init__(self, tz: TzInput) -> None:
         self._tz = coerce_zoneinfo(tz)
         self._calendar_name: str | None = None
+        self._local_day_window_cache: OrderedDict[date, tuple[BusinessInterval, ...]] = (
+            OrderedDict()
+        )
 
     @property
     def tz(self) -> ZoneInfo:
@@ -61,7 +66,7 @@ class BusinessCalendar(ABC):
         target_tz = self.tz if tz is None else _resolve_render_tz(tz)
         target_day = _coerce_day_in_timezone(day, target_tz)
         if target_tz == self.tz:
-            return self._business_windows_for_day_local(target_day)
+            return self._cached_business_windows_for_day_local(target_day)
         day_start = datetime.combine(target_day, time.min, tzinfo=target_tz)
         day_end = day_start + timedelta(days=1)
         return self.business_windows_for_range(day_start, day_end, tz=target_tz)
@@ -89,7 +94,7 @@ class BusinessCalendar(ABC):
         range_interval = BusinessInterval(range_start, range_end)
         intervals: list[BusinessInterval] = []
         for current_day in _iter_days(local_start.date(), local_end.date()):
-            for interval in self._business_windows_for_day_local(current_day):
+            for interval in self._cached_business_windows_for_day_local(current_day):
                 projected = interval.to_timezone(target_tzinfo)
                 overlap = projected.intersection(range_interval)
                 if overlap is not None:
@@ -431,6 +436,17 @@ class BusinessCalendar(ABC):
                 tzinfo=target_tzinfo,
             )
         raise CalendarRangeError("Unable to subtract business time within the search horizon.")
+
+    def _cached_business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
+        cached = self._local_day_window_cache.get(day)
+        if cached is not None:
+            self._local_day_window_cache.move_to_end(day)
+            return cached
+        windows = self._business_windows_for_day_local(day)
+        self._local_day_window_cache[day] = windows
+        if len(self._local_day_window_cache) > _LOCAL_DAY_WINDOW_CACHE_SIZE:
+            self._local_day_window_cache.popitem(last=False)
+        return windows
 
 
 def _iter_days(start: date, end: date) -> tuple[date, ...]:

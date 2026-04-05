@@ -535,6 +535,8 @@ See the full documentation in:
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/api.md`](docs/api.md)
 - [`docs/django-integration.md`](docs/django-integration.md)
+- [`docs/production.md`](docs/production.md)
+- [`docs/upgrading.md`](docs/upgrading.md)
 - [`docs/release.md`](docs/release.md)
 
 ## Compatibility

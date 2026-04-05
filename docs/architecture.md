@@ -72,6 +72,7 @@ Responsibilities:
 
 - Expose a reusable `AppConfig`
 - Resolve namespaced settings
+- Cache resolved settings for process-local reuse
 - Build and cache the default calendar
 - Resolve named calendars and optionally apply persisted holiday closures and day overrides
 - Resolve calendars from tenant-, client-, or region-like context through a pluggable resolver hook
@@ -79,6 +80,20 @@ Responsibilities:
 - Provide helpers that fit typical Django service usage
 
 No domain logic depends on ORM models, request objects, middleware, or settings globals.
+
+## Performance strategy
+
+The core calendar objects are treated as immutable once built.
+
+That lets the domain layer memoize normalized business windows per local day on
+each calendar instance, while keeping the cache bounded so long-lived processes
+do not grow without limit.
+
+The practical effect is:
+
+- repeated day queries on the same calendar instance avoid rebuilding intervals
+- range and business-time operations reuse previously computed day windows
+- Django invalidation still happens by replacing cached calendar instances rather than mutating them in place
 
 ## Why persistence stays minimal
 

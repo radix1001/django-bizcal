@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from django_bizcal.services import reset_calendar_cache
+from django_bizcal.services import reset_calendar_cache, reset_deadline_policy_cache
 from django_bizcal.settings import DEFAULT_WEEKLY_SCHEDULE, get_bizcal_settings
 
 
@@ -18,6 +18,7 @@ def test_settings_load_defaults(settings) -> None:
     assert resolved.default_calendar_name == "default"
     assert tuple(resolved.calendar_configs) == ("default",)
     assert resolved.default_calendar_config["weekly_schedule"] == DEFAULT_WEEKLY_SCHEDULE
+    assert resolved is get_bizcal_settings()
 
 
 def test_settings_load_named_calendars(settings) -> None:
@@ -119,3 +120,39 @@ def test_settings_reject_invalid_deadline_policy_resolver(settings) -> None:
 
     with pytest.raises(ValueError):
         get_bizcal_settings()
+
+
+def test_global_cache_reset_reloads_settings_objects(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "default"
+    reset_calendar_cache()
+
+    before = get_bizcal_settings()
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+
+    assert get_bizcal_settings() is before
+
+    reset_calendar_cache()
+    after = get_bizcal_settings()
+
+    assert after is not before
+    assert after.default_calendar_name == "support"
+
+
+def test_deadline_policy_cache_reset_also_reloads_settings_objects(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEADLINE_POLICY_RESOLVER = None
+    reset_calendar_cache()
+
+    before = get_bizcal_settings()
+    settings.BIZCAL_DEADLINE_POLICY_RESOLVER = (
+        "tests.django_test_project.deadline_policy_resolvers.priority_deadline_policy_resolver"
+    )
+
+    assert get_bizcal_settings() is before
+
+    reset_deadline_policy_cache()
+    after = get_bizcal_settings()
+
+    assert after is not before
+    assert after.deadline_policy_resolver is not None

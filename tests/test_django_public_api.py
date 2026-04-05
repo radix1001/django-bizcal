@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import django_bizcal.django_api as django_api
 from django_bizcal.django_api import (
     BusinessDaysAtClosePolicy,
     BusinessDaysPolicy,
@@ -61,6 +62,67 @@ from django_bizcal.django_api import (
     sync_calendar_holidays,
 )
 
+EXPECTED_DJANGO_PUBLIC_API = {
+    "CalendarDayOverride",
+    "CalendarDayOverrideWindow",
+    "CalendarHoliday",
+    "CalendarResolution",
+    "DeadlinePolicyResolution",
+    "BusinessDaysAtClosePolicy",
+    "BusinessDaysPolicy",
+    "BusinessDeadline",
+    "BusinessDurationPolicy",
+    "CloseOfBusinessPolicy",
+    "CutoffPolicy",
+    "DatabaseDayOverrideProvider",
+    "DatabaseHolidayProvider",
+    "DeadlinePolicy",
+    "DeadlinePolicyBuilder",
+    "NextBusinessDayPolicy",
+    "SameBusinessDayPolicy",
+    "activate_calendar_day_override",
+    "activate_calendar_holiday",
+    "apply_database_holiday_overrides",
+    "apply_database_overrides",
+    "breach_at",
+    "build_calendar",
+    "build_deadline_policy",
+    "business_deadline_at_close",
+    "compute_deadline",
+    "deactivate_calendar_day_override",
+    "deactivate_calendar_holiday",
+    "deadline_for",
+    "delete_calendar_day_override",
+    "delete_calendar_holiday",
+    "due_on_next_business_day",
+    "get_calendar",
+    "get_deadline_policy_config",
+    "get_deadline_policy",
+    "get_deadline_policy_for",
+    "get_calendar_for",
+    "get_calendar_day_override",
+    "get_calendar_day_override_windows",
+    "get_calendar_holiday",
+    "get_default_calendar",
+    "list_calendar_day_overrides",
+    "list_calendar_day_override_windows",
+    "list_calendar_holiday_days",
+    "list_calendar_holidays",
+    "list_configured_calendars",
+    "list_configured_deadline_policies",
+    "now",
+    "reset_calendar_cache",
+    "reset_deadline_policy_cache",
+    "resolve_calendar_for",
+    "resolve_deadline_policy_for",
+    "is_breached",
+    "remaining_business_time",
+    "set_calendar_day_override",
+    "set_calendar_holiday",
+    "sync_calendar_day_overrides",
+    "sync_calendar_holidays",
+}
+
 
 def test_django_api_exports_stable_helpers() -> None:
     assert BusinessDaysAtClosePolicy is not None
@@ -121,3 +183,4 @@ def test_django_api_exports_stable_helpers() -> None:
     assert set_calendar_holiday is not None
     assert sync_calendar_day_overrides is not None
     assert sync_calendar_holidays is not None
+    assert set(django_api.__all__) == EXPECTED_DJANGO_PUBLIC_API

@@ -14,6 +14,10 @@ INSTALLED_APPS = [
 The app remains lightweight.
 Its persistence layer is intentionally small: optional models for full-day closures and per-day intraday overrides, not full calendar-definition storage.
 
+Resolved Django settings are also cached process-locally for reuse. In tests or
+reload scenarios that mutate settings dynamically, call `reset_calendar_cache()`
+or `reset_deadline_policy_cache()` before re-resolving calendars or policies.
+
 ## Settings
 
 Supported settings:

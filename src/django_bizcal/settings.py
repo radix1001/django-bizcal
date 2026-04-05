@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import TYPE_CHECKING, Any, cast
 from zoneinfo import ZoneInfo
 
@@ -166,6 +166,16 @@ class BizcalSettings:
 
 def get_bizcal_settings() -> BizcalSettings:
     """Return resolved settings for the current Django process."""
+    return _load_bizcal_settings()
+
+
+def reset_bizcal_settings_cache() -> None:
+    """Clear the cached resolved settings for the current process."""
+    _load_bizcal_settings.cache_clear()
+
+
+@lru_cache(maxsize=1)
+def _load_bizcal_settings() -> BizcalSettings:
     return BizcalSettings.load()
 
 

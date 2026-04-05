@@ -24,7 +24,7 @@ from .resolvers import (
     normalize_calendar_resolution,
     normalize_deadline_policy_resolution,
 )
-from .settings import get_bizcal_settings
+from .settings import get_bizcal_settings, reset_bizcal_settings_cache
 from .types import DateInput, TimeInput, coerce_date, ensure_aware
 from .windows import TimeWindow, build_time_windows
 
@@ -253,6 +253,7 @@ def reset_deadline_policy_cache(name: str | None = None) -> None:
         if name is None:
             _DEADLINE_POLICY_CACHE.clear()
             _CONTEXT_DEADLINE_POLICY_CACHE.clear()
+            reset_bizcal_settings_cache()
             return
         normalized_name = _normalize_calendar_name(name)
         _DEADLINE_POLICY_CACHE.pop(normalized_name, None)
@@ -725,6 +726,7 @@ def reset_calendar_cache(name: str | None = None) -> None:
             _CONTEXT_CALENDAR_CACHE.clear()
             _DEADLINE_POLICY_CACHE.clear()
             _CONTEXT_DEADLINE_POLICY_CACHE.clear()
+            reset_bizcal_settings_cache()
             return
         normalized_name = _normalize_calendar_name(name)
         _CALENDAR_CACHE.pop(normalized_name, None)

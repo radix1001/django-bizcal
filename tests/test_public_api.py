@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import django_bizcal
 from django_bizcal import (
     BusinessCalendar,
     BusinessDaysAtClosePolicy,
@@ -46,6 +47,53 @@ from django_bizcal import (
     remaining_business_time,
 )
 
+EXPECTED_ROOT_PUBLIC_API = {
+    "BusinessCalendar",
+    "BusinessDaysAtClosePolicy",
+    "BusinessDaysAtClosePolicyConfig",
+    "BusinessDaysPolicy",
+    "BusinessDaysPolicyConfig",
+    "BusinessDeadline",
+    "BusinessDurationPolicy",
+    "BusinessDurationPolicyConfig",
+    "BusinessInterval",
+    "CalendarBuilder",
+    "CalendarConfig",
+    "CloseOfBusinessPolicy",
+    "CloseOfBusinessPolicyConfig",
+    "CutoffPolicy",
+    "CutoffPolicyConfig",
+    "DateInput",
+    "DeadlinePolicy",
+    "DeadlinePolicyBuilder",
+    "DeadlinePolicyConfig",
+    "DifferenceCalendar",
+    "DifferenceCalendarConfig",
+    "HolidayProvider",
+    "IntersectionCalendar",
+    "IntersectionCalendarConfig",
+    "NextBusinessDayPolicy",
+    "NextBusinessDayPolicyConfig",
+    "OverrideCalendar",
+    "OverrideCalendarConfig",
+    "RenderTzInput",
+    "SameBusinessDayPolicy",
+    "SameBusinessDayPolicyConfig",
+    "TimeInput",
+    "TimeWindow",
+    "TzInput",
+    "UnionCalendar",
+    "UnionCalendarConfig",
+    "WorkingCalendar",
+    "WorkingCalendarConfig",
+    "breach_at",
+    "business_deadline_at_close",
+    "deadline_for",
+    "due_on_next_business_day",
+    "is_breached",
+    "remaining_business_time",
+}
+
 
 def test_root_package_exports_public_api_symbols() -> None:
     assert BusinessCalendar is not None
@@ -91,3 +139,4 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert due_on_next_business_day is not None
     assert is_breached is not None
     assert remaining_business_time is not None
+    assert set(django_bizcal.__all__) == EXPECTED_ROOT_PUBLIC_API
