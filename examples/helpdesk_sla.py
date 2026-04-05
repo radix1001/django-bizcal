@@ -7,9 +7,14 @@ and a contextual resolver or named calendar registry already configured.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from django_bizcal.django_api import get_calendar_for, is_breached, remaining_business_time
+from django_bizcal.django_api import (
+    get_calendar_for,
+    get_deadline_policy_for,
+    is_breached,
+    remaining_business_time,
+)
 
 
 @dataclass(frozen=True)
@@ -18,16 +23,6 @@ class Ticket:
     region: str
     created_at: datetime
     priority: str
-
-
-def sla_for_priority(priority: str) -> timedelta:
-    mapping = {
-        "critical": timedelta(hours=4),
-        "high": timedelta(hours=8),
-        "normal": timedelta(hours=16),
-    }
-    return mapping[priority]
-
 
 def main() -> None:
     ticket = Ticket(
@@ -38,7 +33,12 @@ def main() -> None:
     )
 
     calendar = get_calendar_for(tenant=ticket.tenant, region=ticket.region)
-    deadline = calendar.deadline_for(ticket.created_at, sla_for_priority(ticket.priority))
+    policy = get_deadline_policy_for(
+        tenant=ticket.tenant,
+        region=ticket.region,
+        priority=ticket.priority,
+    )
+    deadline = calendar.resolve_deadline_policy(ticket.created_at, policy)
     checkpoint = datetime.fromisoformat("2026-12-24T18:00:00+00:00")
 
     print(deadline.calendar_name)

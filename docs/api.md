@@ -320,6 +320,7 @@ For Django-only persistence and service helpers, use `django_bizcal.django_api`.
 Stable Django-specific exports include:
 
 - `CalendarResolution`
+- `DeadlinePolicyResolution`
 - `CalendarHoliday`
 - `CalendarDayOverride`
 - `CalendarDayOverrideWindow`
@@ -331,6 +332,8 @@ Stable Django-specific exports include:
 - `get_calendar(name)`
 - `get_deadline_policy_config(name)`
 - `get_deadline_policy(name)`
+- `resolve_deadline_policy_for(context=None, **kwargs)`
+- `get_deadline_policy_for(context=None, **kwargs)`
 - `build_deadline_policy(config)`
 - `compute_deadline(policy_name, start, calendar=None, context=None, calendar_name=None, **kwargs)`
 - `resolve_calendar_for(context=None, **kwargs)`
@@ -354,6 +357,8 @@ Stable Django-specific exports include:
 - `delete_calendar_day_override(...)`
 - `sync_calendar_holidays(...)`
 - `sync_calendar_day_overrides(...)`
+- `reset_calendar_cache(name=None)`
+- `reset_deadline_policy_cache(name=None)`
 
 ### Context-aware resolution
 
@@ -376,3 +381,30 @@ Supported resolver outputs:
 - named resolutions reuse the existing named calendar cache
 - config-only resolutions build an ad hoc calendar each call unless `cache_key` is provided
 - config resolutions with both `name` and `cache_key` can also participate in persisted holiday and day-override application plus targeted cache invalidation
+
+### Context-aware deadline-policy resolution
+
+`resolve_deadline_policy_for(...)` delegates to `BIZCAL_DEADLINE_POLICY_RESOLVER`
+and normalizes the result into `DeadlinePolicyResolution`.
+
+Supported resolver outputs:
+
+- a named deadline policy such as `"support_p1"`
+- a serializable `DeadlinePolicyConfig`
+- `DeadlinePolicyResolution`
+
+`DeadlinePolicyResolution` fields:
+
+- `name`: logical deadline-policy name
+- `config`: explicit deadline-policy definition to build instead of looking up a named config from settings
+- `cache_key`: optional memoization key for config-based contextual deadline policies
+
+`get_deadline_policy_for(...)` resolves the context and returns a built policy:
+
+- named resolutions reuse the existing named deadline-policy cache
+- config-only resolutions build an ad hoc policy each call unless `cache_key` is provided
+- config resolutions with both `name` and `cache_key` participate in targeted deadline-policy cache invalidation
+
+`compute_deadline(...)` keeps the existing named-policy path, and also accepts
+`policy_name=None` to resolve the deadline policy from the same contextual inputs
+used for calendar resolution.

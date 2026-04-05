@@ -20,7 +20,7 @@ from .policies import DeadlinePolicy, DeadlinePolicyBuilder
 from .types import coerce_zoneinfo
 
 if TYPE_CHECKING:
-    from .resolvers import CalendarResolver
+    from .resolvers import CalendarResolver, DeadlinePolicyResolver
 
 DEFAULT_WEEKLY_SCHEDULE: dict[int, list[tuple[str, str]]] = {
     0: [("09:00", "18:00")],
@@ -44,6 +44,7 @@ class BizcalSettings:
     calendar_configs: dict[str, CalendarConfig]
     deadline_policy_configs: dict[str, DeadlinePolicyConfig]
     calendar_resolver: CalendarResolver | None
+    deadline_policy_resolver: DeadlinePolicyResolver | None
 
     @classmethod
     def load(cls) -> BizcalSettings:
@@ -68,6 +69,9 @@ class BizcalSettings:
         enable_db_models = bool(getattr(django_settings, "BIZCAL_ENABLE_DB_MODELS", False))
         calendar_resolver = _resolve_calendar_resolver(
             getattr(django_settings, "BIZCAL_CALENDAR_RESOLVER", None)
+        )
+        deadline_policy_resolver = _resolve_deadline_policy_resolver(
+            getattr(django_settings, "BIZCAL_DEADLINE_POLICY_RESOLVER", None)
         )
         configured_default = getattr(django_settings, "BIZCAL_DEFAULT_CALENDAR", None)
         default_was_explicit = configured_default is not None
@@ -102,6 +106,7 @@ class BizcalSettings:
             calendar_configs=calendar_configs,
             deadline_policy_configs=deadline_policy_configs,
             calendar_resolver=calendar_resolver,
+            deadline_policy_resolver=deadline_policy_resolver,
         )
 
     @cached_property
@@ -167,15 +172,35 @@ def get_bizcal_settings() -> BizcalSettings:
 def _resolve_calendar_resolver(value: Any) -> CalendarResolver | None:
     from .resolvers import CalendarResolver
 
+    return cast(
+        CalendarResolver | None,
+        _resolve_optional_callable(
+            value,
+            setting_name="BIZCAL_CALENDAR_RESOLVER",
+        ),
+    )
+
+
+def _resolve_deadline_policy_resolver(value: Any) -> DeadlinePolicyResolver | None:
+    from .resolvers import DeadlinePolicyResolver
+
+    return cast(
+        DeadlinePolicyResolver | None,
+        _resolve_optional_callable(
+            value,
+            setting_name="BIZCAL_DEADLINE_POLICY_RESOLVER",
+        ),
+    )
+
+
+def _resolve_optional_callable(value: Any, *, setting_name: str) -> Any:
     if value is None:
         return None
     if isinstance(value, str):
         value = import_string(value)
     if not callable(value):
-        raise ValueError(
-            "BIZCAL_CALENDAR_RESOLVER must be a callable or dotted import path."
-        )
-    return cast(CalendarResolver, value)
+        raise ValueError(f"{setting_name} must be a callable or dotted import path.")
+    return value
 
 
 def _resolve_preload_years(value: Any, timezone: ZoneInfo) -> tuple[int, ...]:

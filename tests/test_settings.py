@@ -97,3 +97,25 @@ def test_settings_reject_invalid_calendar_resolver(settings) -> None:
 
     with pytest.raises(ValueError):
         get_bizcal_settings()
+
+
+def test_settings_load_deadline_policy_resolver_from_dotted_path(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEADLINE_POLICY_RESOLVER = (
+        "tests.django_test_project.deadline_policy_resolvers.priority_deadline_policy_resolver"
+    )
+    reset_calendar_cache()
+
+    resolved = get_bizcal_settings()
+
+    assert resolved.deadline_policy_resolver is not None
+    assert callable(resolved.deadline_policy_resolver)
+
+
+def test_settings_reject_invalid_deadline_policy_resolver(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEADLINE_POLICY_RESOLVER = 123
+    reset_calendar_cache()
+
+    with pytest.raises(ValueError):
+        get_bizcal_settings()

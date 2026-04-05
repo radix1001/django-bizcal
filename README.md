@@ -22,6 +22,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Reusable Django app with namespaced settings and service helpers.
 - Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
 - Context-aware Django calendar resolution for tenant, client, or region specific lookups.
+- Context-aware Django deadline-policy resolution for tenant, priority, or workflow specific SLA rules.
 - Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
 
 ## Installation
@@ -319,6 +320,28 @@ BIZCAL_DEADLINE_POLICIES = {
 }
 ```
 
+And, when policy selection depends on business context, resolve it the same way you already
+resolve calendars:
+
+```python
+from django_bizcal.django_api import DeadlinePolicyResolution
+
+
+def support_policy_resolver(*, context, bizcal_settings):
+    priority = str(context["priority"]).strip().lower()
+    if priority == "critical":
+        return "support_p1"
+    tenant = str(context["tenant"]).strip().lower()
+    return DeadlinePolicyResolution.for_config(
+        {"type": "same_business_day", "at": "closing"},
+        name=f"tenant_policy:{tenant}:{priority}",
+        cache_key=f"tenant_policy:{tenant}:{priority}",
+    )
+
+
+BIZCAL_DEADLINE_POLICY_RESOLVER = support_policy_resolver
+```
+
 And use the same deadline helpers on top of contextual calendars:
 
 ```python
@@ -344,6 +367,7 @@ from django_bizcal.django_api import (
     compute_deadline,
     get_deadline_policy,
     get_deadline_policy_config,
+    get_deadline_policy_for,
 )
 
 deadline = compute_deadline(
@@ -355,6 +379,18 @@ deadline = compute_deadline(
 
 policy = get_deadline_policy("support_cutoff")
 policy_config = get_deadline_policy_config("support_cutoff")
+contextual_policy = get_deadline_policy_for(
+    tenant="acme",
+    region="cl",
+    priority="critical",
+)
+contextual_deadline = compute_deadline(
+    policy_name=None,
+    start=now(),
+    tenant="acme",
+    region="cl",
+    priority="critical",
+)
 ```
 
 Calendars resolved through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)` also carry their logical `calendar_name`, so `BusinessDeadline.calendar_name` is filled automatically in the common Django flows.

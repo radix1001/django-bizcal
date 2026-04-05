@@ -18,7 +18,12 @@ from .db import replace_day_override_windows
 from .deadlines import BusinessDeadline
 from .exceptions import CalendarConfigurationError, ValidationError
 from .policies import DeadlinePolicy, DeadlinePolicyBuilder
-from .resolvers import CalendarResolution, normalize_calendar_resolution
+from .resolvers import (
+    CalendarResolution,
+    DeadlinePolicyResolution,
+    normalize_calendar_resolution,
+    normalize_deadline_policy_resolution,
+)
 from .settings import get_bizcal_settings
 from .types import DateInput, TimeInput, coerce_date, ensure_aware
 from .windows import TimeWindow, build_time_windows
@@ -34,11 +39,18 @@ _CALENDAR_CACHE: dict[str, BusinessCalendar] = {}
 _CALENDAR_CACHE_LOCK = RLock()
 _CONTEXT_CALENDAR_CACHE: dict[str, _ContextCalendarCacheEntry] = {}
 _DEADLINE_POLICY_CACHE: dict[str, DeadlinePolicy] = {}
+_CONTEXT_DEADLINE_POLICY_CACHE: dict[str, _ContextDeadlinePolicyCacheEntry] = {}
 
 
 @dataclass(frozen=True, slots=True)
 class _ContextCalendarCacheEntry:
     calendar: BusinessCalendar
+    invalidate_names: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ContextDeadlinePolicyCacheEntry:
+    policy: DeadlinePolicy
     invalidate_names: frozenset[str]
 
 
@@ -77,6 +89,47 @@ def get_deadline_policy(name: str) -> DeadlinePolicy:
         return _DEADLINE_POLICY_CACHE.setdefault(normalized_name, policy)
 
 
+def resolve_deadline_policy_for(
+    context: Mapping[str, Any] | None = None,
+    **kwargs: Any,
+) -> DeadlinePolicyResolution:
+    """Resolve a contextual deadline-policy target using its configured resolver."""
+    resolved_context = _normalize_context(context, kwargs)
+    current_settings = get_bizcal_settings()
+    resolver = current_settings.deadline_policy_resolver
+    if resolver is None:
+        raise CalendarConfigurationError(
+            "BIZCAL_DEADLINE_POLICY_RESOLVER is not configured. "
+            "Use get_deadline_policy(name) for direct named lookups or configure "
+            "a contextual deadline-policy resolver."
+        )
+    return normalize_deadline_policy_resolution(
+        resolver(context=resolved_context, bizcal_settings=current_settings)
+    )
+
+
+def get_deadline_policy_for(
+    context: Mapping[str, Any] | None = None,
+    **kwargs: Any,
+) -> DeadlinePolicy:
+    """Resolve and return a deadline policy for tenant-, region-, or client-like context."""
+    resolution = resolve_deadline_policy_for(context, **kwargs)
+    if resolution.config is None:
+        assert resolution.name is not None
+        return get_deadline_policy(resolution.name)
+    if resolution.cache_key is None:
+        return _build_contextual_deadline_policy(resolution)
+    with _CALENDAR_CACHE_LOCK:
+        cached = _CONTEXT_DEADLINE_POLICY_CACHE.get(resolution.cache_key)
+        if cached is not None:
+            return cached.policy
+    policy = _build_contextual_deadline_policy(resolution)
+    invalidate_names = frozenset((resolution.name,)) if resolution.name else frozenset()
+    entry = _ContextDeadlinePolicyCacheEntry(policy=policy, invalidate_names=invalidate_names)
+    with _CALENDAR_CACHE_LOCK:
+        return _CONTEXT_DEADLINE_POLICY_CACHE.setdefault(resolution.cache_key, entry).policy
+
+
 def get_deadline_policy_config(name: str) -> DeadlinePolicyConfig:
     """Return a configured named deadline policy definition from Django settings."""
     return get_bizcal_settings().get_deadline_policy_config(_normalize_calendar_name(name))
@@ -90,7 +143,7 @@ def build_deadline_policy(
 
 
 def compute_deadline(
-    policy_name: str,
+    policy_name: str | None,
     start: Any,
     *,
     calendar: BusinessCalendar | None = None,
@@ -98,22 +151,33 @@ def compute_deadline(
     calendar_name: str | None = None,
     **kwargs: Any,
 ) -> BusinessDeadline:
-    """Compute a deadline using a named policy and a resolved calendar."""
+    """Compute a deadline using a named or contextually resolved policy."""
     normalized_start = ensure_aware(start, param_name="start")
-    if calendar is not None and (context is not None or kwargs):
+    has_context_inputs = context is not None or bool(kwargs)
+    resolved_context = _normalize_context(context, kwargs) if has_context_inputs else None
+    if calendar is not None and resolved_context is not None:
         raise ValidationError(
             "compute_deadline accepts either an explicit calendar "
             "or contextual resolver inputs, not both."
         )
+    if policy_name is None and resolved_context is None:
+        raise ValidationError(
+            "compute_deadline requires policy_name when no contextual resolver inputs are provided."
+        )
     if calendar is None:
         resolved_calendar = (
-            get_calendar_for(context, **kwargs)
-            if context is not None or kwargs
+            get_calendar_for(resolved_context)
+            if resolved_context is not None
             else get_default_calendar()
         )
     else:
         resolved_calendar = calendar
-    return get_deadline_policy(policy_name).resolve(
+    resolved_policy = (
+        get_deadline_policy(policy_name)
+        if policy_name is not None
+        else get_deadline_policy_for(resolved_context)
+    )
+    return resolved_policy.resolve(
         normalized_start,
         calendar=resolved_calendar,
         calendar_name=calendar_name or resolved_calendar.calendar_name,
@@ -181,6 +245,24 @@ def list_configured_calendars() -> tuple[str, ...]:
 def list_configured_deadline_policies() -> tuple[str, ...]:
     """Return configured named deadline policies from settings."""
     return tuple(get_bizcal_settings().deadline_policy_configs)
+
+
+def reset_deadline_policy_cache(name: str | None = None) -> None:
+    """Clear all cached deadline policies or only one logical policy name."""
+    with _CALENDAR_CACHE_LOCK:
+        if name is None:
+            _DEADLINE_POLICY_CACHE.clear()
+            _CONTEXT_DEADLINE_POLICY_CACHE.clear()
+            return
+        normalized_name = _normalize_calendar_name(name)
+        _DEADLINE_POLICY_CACHE.pop(normalized_name, None)
+        stale_context_keys = [
+            cache_key
+            for cache_key, entry in _CONTEXT_DEADLINE_POLICY_CACHE.items()
+            if normalized_name in entry.invalidate_names
+        ]
+        for cache_key in stale_context_keys:
+            _CONTEXT_DEADLINE_POLICY_CACHE.pop(cache_key, None)
 
 
 def list_calendar_holidays(
@@ -642,6 +724,7 @@ def reset_calendar_cache(name: str | None = None) -> None:
             _CALENDAR_CACHE.clear()
             _CONTEXT_CALENDAR_CACHE.clear()
             _DEADLINE_POLICY_CACHE.clear()
+            _CONTEXT_DEADLINE_POLICY_CACHE.clear()
             return
         normalized_name = _normalize_calendar_name(name)
         _CALENDAR_CACHE.pop(normalized_name, None)
@@ -687,6 +770,13 @@ def _build_contextual_calendar(resolution: CalendarResolution) -> BusinessCalend
         ),
         resolution.name,
     )
+
+
+def _build_contextual_deadline_policy(
+    resolution: DeadlinePolicyResolution,
+) -> DeadlinePolicy:
+    assert resolution.config is not None
+    return build_deadline_policy(resolution.config)
 
 
 def _bind_calendar_name(

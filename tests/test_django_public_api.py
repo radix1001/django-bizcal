@@ -15,6 +15,7 @@ from django_bizcal.django_api import (
     DatabaseHolidayProvider,
     DeadlinePolicy,
     DeadlinePolicyBuilder,
+    DeadlinePolicyResolution,
     NextBusinessDayPolicy,
     SameBusinessDayPolicy,
     activate_calendar_day_override,
@@ -39,6 +40,7 @@ from django_bizcal.django_api import (
     get_calendar_holiday,
     get_deadline_policy,
     get_deadline_policy_config,
+    get_deadline_policy_for,
     get_default_calendar,
     is_breached,
     list_calendar_day_override_windows,
@@ -50,7 +52,9 @@ from django_bizcal.django_api import (
     now,
     remaining_business_time,
     reset_calendar_cache,
+    reset_deadline_policy_cache,
     resolve_calendar_for,
+    resolve_deadline_policy_for,
     set_calendar_day_override,
     set_calendar_holiday,
     sync_calendar_day_overrides,
@@ -67,6 +71,7 @@ def test_django_api_exports_stable_helpers() -> None:
     assert CalendarDayOverrideWindow is not None
     assert CalendarHoliday is not None
     assert CalendarResolution is not None
+    assert DeadlinePolicyResolution is not None
     assert CloseOfBusinessPolicy is not None
     assert CutoffPolicy is not None
     assert DatabaseDayOverrideProvider is not None
@@ -93,6 +98,7 @@ def test_django_api_exports_stable_helpers() -> None:
     assert get_calendar is not None
     assert get_deadline_policy_config is not None
     assert get_deadline_policy is not None
+    assert get_deadline_policy_for is not None
     assert get_calendar_for is not None
     assert get_calendar_day_override is not None
     assert get_calendar_day_override_windows is not None
@@ -108,7 +114,9 @@ def test_django_api_exports_stable_helpers() -> None:
     assert is_breached is not None
     assert remaining_business_time is not None
     assert reset_calendar_cache is not None
+    assert reset_deadline_policy_cache is not None
     assert resolve_calendar_for is not None
+    assert resolve_deadline_policy_for is not None
     assert set_calendar_day_override is not None
     assert set_calendar_holiday is not None
     assert sync_calendar_day_overrides is not None

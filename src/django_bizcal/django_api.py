@@ -27,7 +27,7 @@ from .policies import (
     NextBusinessDayPolicy,
     SameBusinessDayPolicy,
 )
-from .resolvers import CalendarResolution
+from .resolvers import CalendarResolution, DeadlinePolicyResolution
 from .services import (
     activate_calendar_day_override,
     activate_calendar_holiday,
@@ -45,6 +45,7 @@ from .services import (
     get_calendar_holiday,
     get_deadline_policy,
     get_deadline_policy_config,
+    get_deadline_policy_for,
     get_default_calendar,
     list_calendar_day_override_windows,
     list_calendar_day_overrides,
@@ -54,7 +55,9 @@ from .services import (
     list_configured_deadline_policies,
     now,
     reset_calendar_cache,
+    reset_deadline_policy_cache,
     resolve_calendar_for,
+    resolve_deadline_policy_for,
     set_calendar_day_override,
     set_calendar_holiday,
     sync_calendar_day_overrides,
@@ -66,6 +69,7 @@ __all__ = [
     "CalendarDayOverrideWindow",
     "CalendarHoliday",
     "CalendarResolution",
+    "DeadlinePolicyResolution",
     "BusinessDaysAtClosePolicy",
     "BusinessDaysPolicy",
     "BusinessDeadline",
@@ -96,6 +100,7 @@ __all__ = [
     "get_calendar",
     "get_deadline_policy_config",
     "get_deadline_policy",
+    "get_deadline_policy_for",
     "get_calendar_for",
     "get_calendar_day_override",
     "get_calendar_day_override_windows",
@@ -109,7 +114,9 @@ __all__ = [
     "list_configured_deadline_policies",
     "now",
     "reset_calendar_cache",
+    "reset_deadline_policy_cache",
     "resolve_calendar_for",
+    "resolve_deadline_policy_for",
     "is_breached",
     "remaining_business_time",
     "set_calendar_day_override",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+
+- Added contextual deadline-policy resolution for Django through `BIZCAL_DEADLINE_POLICY_RESOLVER`, `DeadlinePolicyResolution`, `resolve_deadline_policy_for(...)`, and `get_deadline_policy_for(...)`.
+- Extended `compute_deadline(...)` so `policy_name=None` can resolve the deadline policy from the same contextual inputs already used for calendar resolution.
+- Added targeted deadline-policy cache management with `reset_deadline_policy_cache(...)`, while keeping global `reset_calendar_cache()` behavior backward compatible for settings reload scenarios.
+- Expanded examples, docs, settings coverage, and Django integration tests for contextual SLA-policy selection by tenant, priority, and workflow context.
+
 ## 0.7.0
 
 - Added `BusinessDaysPolicy` so declarative deadline rules can target the opening, closing, or a fixed snapped wall-clock time after an arbitrary number of business-day boundaries.

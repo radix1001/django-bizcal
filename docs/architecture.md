@@ -75,6 +75,7 @@ Responsibilities:
 - Build and cache the default calendar
 - Resolve named calendars and optionally apply persisted holiday closures and day overrides
 - Resolve calendars from tenant-, client-, or region-like context through a pluggable resolver hook
+- Resolve deadline policies from tenant-, priority-, or workflow-like context through a pluggable resolver hook
 - Provide helpers that fit typical Django service usage
 
 No domain logic depends on ORM models, request objects, middleware, or settings globals.
@@ -158,6 +159,7 @@ Stable v1 public imports are exposed from `django_bizcal`:
 Stable Django-specific imports are exposed from `django_bizcal.django_api` for:
 
 - calendar service resolution
+- deadline-policy service resolution
 - optional persistence helpers and models
 - deadline-policy lookup and execution
 

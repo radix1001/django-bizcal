@@ -92,6 +92,16 @@ def test_resolvers_cover_mapping_and_validation_branches() -> None:
     assert resolution.config is not None
     assert resolution.name is None
 
+    deadline_policy_resolution = resolvers_module.normalize_deadline_policy_resolution(
+        {
+            "type": "business_duration",
+            "business_hours": 4,
+        }
+    )
+
+    assert deadline_policy_resolution.config is not None
+    assert deadline_policy_resolution.name is None
+
     with pytest.raises(CalendarConfigurationError):
         resolvers_module.CalendarResolution()
     with pytest.raises(CalendarConfigurationError):
@@ -100,6 +110,16 @@ def test_resolvers_cover_mapping_and_validation_branches() -> None:
                 "type": "working",
                 "tz": "UTC",
                 "weekly_schedule": {"0": [["09:00", "18:00"]]},
+            },
+            cache_key="   ",
+        )
+    with pytest.raises(CalendarConfigurationError):
+        resolvers_module.DeadlinePolicyResolution()
+    with pytest.raises(CalendarConfigurationError):
+        resolvers_module.DeadlinePolicyResolution.for_config(
+            {
+                "type": "business_duration",
+                "business_hours": 4,
             },
             cache_key="   ",
         )

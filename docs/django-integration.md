@@ -27,6 +27,7 @@ Supported settings:
 - `BIZCAL_CALENDARS`
 - `BIZCAL_CALENDAR_RESOLVER`
 - `BIZCAL_DEADLINE_POLICIES`
+- `BIZCAL_DEADLINE_POLICY_RESOLVER`
 
 ### `BIZCAL_DEFAULT_TIMEZONE`
 
@@ -215,6 +216,49 @@ BIZCAL_DEADLINE_POLICIES = {
 
 This enables a lightweight policy layer for recurring operational rules without forcing each Django app to hand-roll deadline logic.
 
+### `BIZCAL_DEADLINE_POLICY_RESOLVER`
+
+Optional callable or dotted import path used by `resolve_deadline_policy_for(...)`
+and `get_deadline_policy_for(...)`.
+
+The resolver receives:
+
+- `context`: a plain mapping with tenant-, priority-, workflow-, or region-like keys
+- `bizcal_settings`: the resolved `BizcalSettings` instance for the current process
+
+The resolver may return:
+
+- a configured logical deadline-policy name
+- a serializable deadline-policy config mapping
+- `DeadlinePolicyResolution`
+
+Example:
+
+```python
+from django_bizcal.django_api import DeadlinePolicyResolution
+
+
+def support_policy_resolver(*, context, bizcal_settings):
+    priority = str(context["priority"]).strip().lower()
+    if priority == "critical":
+        return "support_p1"
+    tenant = str(context["tenant"]).strip().lower()
+    return DeadlinePolicyResolution.for_config(
+        {"type": "same_business_day", "at": "closing"},
+        name=f"tenant_policy:{tenant}:{priority}",
+        cache_key=f"tenant_policy:{tenant}:{priority}",
+    )
+
+
+BIZCAL_DEADLINE_POLICY_RESOLVER = support_policy_resolver
+```
+
+Guidance:
+
+- return a logical name when the deadline policy already exists in `BIZCAL_DEADLINE_POLICIES`
+- return a config mapping for ad hoc per-context policies
+- return `DeadlinePolicyResolution.for_config(..., name=..., cache_key=...)` when you want contextual memoization with targeted policy-cache invalidation
+
 ## Services
 
 Import recommendation:
@@ -283,6 +327,34 @@ Behavior:
 
 Build and cache a named deadline policy from `BIZCAL_DEADLINE_POLICIES`.
 
+### `resolve_deadline_policy_for(context=None, **kwargs)`
+
+Run the contextual deadline-policy resolver and return a normalized
+`DeadlinePolicyResolution`.
+
+```python
+from django_bizcal.django_api import resolve_deadline_policy_for
+
+resolution = resolve_deadline_policy_for(tenant="acme", priority="critical")
+```
+
+### `get_deadline_policy_for(context=None, **kwargs)`
+
+Resolve and return a deadline policy for tenant-, priority-, workflow-, or region-specific context.
+
+```python
+from django_bizcal.django_api import get_deadline_policy_for
+
+policy = get_deadline_policy_for(tenant="acme", priority="critical")
+```
+
+Behavior:
+
+- named resolutions reuse `get_deadline_policy(name)` and its cache
+- config-only resolutions build an ad hoc policy each call unless a `cache_key` is provided
+- config resolutions with `name` and `cache_key` participate in targeted policy-cache invalidation
+- duplicate keys between the `context` mapping and `**kwargs` raise a validation error instead of silently overriding values
+
 ### `get_deadline_policy_config(name)` and `build_deadline_policy(config)`
 
 Use these helpers when you need:
@@ -314,6 +386,7 @@ Rules:
 - explicit `calendar=...` and contextual resolver inputs cannot be mixed in the same call
 - the resolved calendar's logical `calendar_name` is propagated automatically into the resulting `BusinessDeadline`
 - named deadline policies are cached similarly to named calendars
+- passing `policy_name=None` uses `BIZCAL_DEADLINE_POLICY_RESOLVER` with the same contextual inputs used for calendar resolution
 
 ### Deadline helpers with Django services
 
@@ -373,6 +446,20 @@ deadline = compute_deadline(
     ticket.created_at,
     tenant=ticket.tenant,
     region=ticket.region,
+)
+```
+
+Or let both the calendar and the deadline policy come from shared business context:
+
+```python
+from django_bizcal.django_api import compute_deadline
+
+deadline = compute_deadline(
+    policy_name=None,
+    start=ticket.created_at,
+    tenant=ticket.tenant,
+    region=ticket.region,
+    priority=ticket.priority,
 )
 ```
 
@@ -440,6 +527,7 @@ For read-only inspection without touching ORM relations directly, you can also u
 Cache behavior:
 
 - `reset_calendar_cache()` clears all named calendar instances
+- `reset_calendar_cache()` also clears all named and contextual deadline-policy caches
 - `reset_calendar_cache(name)` clears only one named calendar
 - holiday mutation helpers invalidate only the affected logical calendar
 - contextual cached calendars whose `CalendarResolution.name` matches the invalidated logical name are also evicted
@@ -506,11 +594,17 @@ Return the configured logical calendar names from settings.
 
 Useful in tests or reload scenarios after changing settings.
 
+### `reset_deadline_policy_cache()`
+
+Useful in tests or reload scenarios after changing deadline-policy settings or contextual resolver behavior.
+
 ## Recommended application usage
 
 - Keep calendar construction in a service layer.
 - Reuse singleton-like calendars through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)` when contextual memoization is configured.
+- Reuse `get_deadline_policy(name)` and `get_deadline_policy_for(...)` instead of rebuilding policy objects repeatedly.
 - Use `CalendarHoliday` for tenant or organization closed dates without recompiling calendar configs.
 - Use `CalendarDayOverride` when a specific date needs reduced hours, split shifts, or a one-off intraday schedule.
 - Keep resolver logic thin: derive the logical name or config from business context, then let django-bizcal handle caching and persisted overrides.
+- Prefer shared context keys between calendar and deadline-policy resolvers so `compute_deadline(policy_name=None, ...)` can resolve both layers consistently.
 - Pass aware datetimes from Django models or `django.utils.timezone.now()`.
