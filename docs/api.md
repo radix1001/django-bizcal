@@ -24,6 +24,23 @@ Represents a timezone-aware half-open datetime interval.
 
 Useful when inspecting rendered windows from a calendar.
 
+## Exceptions
+
+Stable package-level exception types:
+
+- `BizcalError`
+- `ValidationError`
+- `CalendarConfigurationError`
+- `CalendarRangeError`
+- `TimezoneError`
+
+Guidance:
+
+- catch `BizcalError` when you want a single library-level boundary
+- catch `ValidationError` for structurally invalid user or config input
+- catch `CalendarConfigurationError` for invalid calendar, resolver, or settings configuration
+- catch `CalendarRangeError` when the requested search horizon cannot be satisfied
+
 ## Calendars
 
 ### `WorkingCalendar`

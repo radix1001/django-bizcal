@@ -160,6 +160,7 @@ Stable v1 public imports are exposed from `django_bizcal`:
 
 - `TimeWindow`
 - `BusinessInterval`
+- public exception types such as `ValidationError` and `CalendarConfigurationError`
 - `WorkingCalendar`
 - `UnionCalendar`
 - `IntersectionCalendar`

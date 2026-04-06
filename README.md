@@ -190,7 +190,7 @@ BIZCAL_DEFAULT_CALENDAR = {
 Consume it from application code:
 
 ```python
-from django_bizcal.services import get_default_calendar
+from django_bizcal.django_api import get_default_calendar
 
 calendar = get_default_calendar()
 deadline = calendar.add_business_hours(ticket.created_at, 8)
@@ -251,7 +251,7 @@ BIZCAL_CALENDARS = {
 Use named calendars from application code:
 
 ```python
-from django_bizcal.services import get_calendar, get_default_calendar
+from django_bizcal.django_api import get_calendar, get_default_calendar
 
 support = get_default_calendar()
 regional_ops = get_calendar("operations_latam")
@@ -543,7 +543,7 @@ See the full documentation in:
 ## Compatibility
 
 - Python 3.11+
-- Officially tested against Django 4.2 LTS, 5.2 LTS, and 6.0
+- Officially tested against Django 5.2 LTS and 6.0
 - CI covers the supported upstream Python and Django combinations documented in [`docs/stability.md`](docs/stability.md)
 
 ## Limitations

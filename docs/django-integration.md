@@ -278,7 +278,7 @@ The `django_api` module is the stable Django-specific import surface for service
 Builds and caches the default calendar from Django settings.
 
 ```python
-from django_bizcal.services import get_default_calendar
+from django_bizcal.django_api import get_default_calendar
 
 calendar = get_default_calendar()
 deadline = calendar.add_business_hours(start_dt, 8)
@@ -293,7 +293,7 @@ Build a calendar from a dict using Django defaults as fallback context.
 Return a named configured calendar and cache it for process reuse.
 
 ```python
-from django_bizcal.services import get_calendar
+from django_bizcal.django_api import get_calendar
 
 calendar = get_calendar("operations_latam")
 deadline = calendar.add_business_hours(start_dt, 6)
@@ -488,8 +488,7 @@ Optional Django model for persisted full-day closures keyed by logical calendar 
 ```python
 from datetime import date
 
-from django_bizcal.models import CalendarHoliday
-from django_bizcal.services import set_calendar_holiday, sync_calendar_holidays
+from django_bizcal.django_api import CalendarHoliday, set_calendar_holiday, sync_calendar_holidays
 
 CalendarHoliday.objects.create(
     calendar_name="support",

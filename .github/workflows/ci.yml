@@ -37,10 +37,6 @@ jobs:
       matrix:
         include:
           - python-version: "3.11"
-            django-version: "4.2"
-          - python-version: "3.12"
-            django-version: "4.2"
-          - python-version: "3.11"
             django-version: "5.2"
           - python-version: "3.12"
             django-version: "5.2"

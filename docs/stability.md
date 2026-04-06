@@ -19,9 +19,9 @@ re-exported by one of the stable package-level modules above.
 
 That means:
 
-- `django_bizcal.api` and `django_bizcal.django_api` are stable surfaces
+- `django_bizcal` and `django_bizcal.django_api` are the stable surfaces
 - direct imports from implementation modules should be treated as lower-level
-- new helpers should prefer package-level exports when they are intended for broad reuse
+- examples and application code should prefer those package-level exports
 
 ## Supported runtime policy
 
@@ -30,7 +30,6 @@ that follows the officially supported Python combinations for those releases.
 
 Current actively tested Django lines:
 
-- Django `4.2` LTS
 - Django `5.2` LTS
 - Django `6.0`
 
@@ -46,8 +45,6 @@ cartesian product because upstream Django support differs by series.
 
 Current CI combinations:
 
-- Python `3.11` with Django `4.2`
-- Python `3.12` with Django `4.2`
 - Python `3.11` with Django `5.2`
 - Python `3.12` with Django `5.2`
 - Python `3.13` with Django `5.2`
@@ -71,6 +68,7 @@ improvements. Starting with `1.0.0`, the intent is:
 - calendar composition semantics
 - deadline helper semantics
 - declarative builders and policy builders
+- public exception types exported from the package-level API
 - Django settings names
 - Django service entry points exported from `django_bizcal.django_api`
 - optional persistence models already published in the Django app

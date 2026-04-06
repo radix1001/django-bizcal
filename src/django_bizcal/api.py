@@ -34,6 +34,13 @@ from .deadlines import (
     is_breached,
     remaining_business_time,
 )
+from .exceptions import (
+    BizcalError,
+    CalendarConfigurationError,
+    CalendarRangeError,
+    TimezoneError,
+    ValidationError,
+)
 from .intervals import BusinessInterval
 from .policies import (
     BusinessDaysAtClosePolicy,
@@ -60,8 +67,11 @@ __all__ = [
     "BusinessDurationPolicy",
     "BusinessDurationPolicyConfig",
     "BusinessInterval",
+    "BizcalError",
     "CalendarBuilder",
     "CalendarConfig",
+    "CalendarConfigurationError",
+    "CalendarRangeError",
     "CloseOfBusinessPolicy",
     "CloseOfBusinessPolicyConfig",
     "CutoffPolicy",
@@ -84,9 +94,11 @@ __all__ = [
     "SameBusinessDayPolicyConfig",
     "TimeInput",
     "TimeWindow",
+    "TimezoneError",
     "TzInput",
     "UnionCalendar",
     "UnionCalendarConfig",
+    "ValidationError",
     "WorkingCalendar",
     "WorkingCalendarConfig",
     "breach_at",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import django_bizcal
 from django_bizcal import (
+    BizcalError,
     BusinessCalendar,
     BusinessDaysAtClosePolicy,
     BusinessDaysAtClosePolicyConfig,
@@ -13,6 +14,8 @@ from django_bizcal import (
     BusinessInterval,
     CalendarBuilder,
     CalendarConfig,
+    CalendarConfigurationError,
+    CalendarRangeError,
     CloseOfBusinessPolicy,
     CloseOfBusinessPolicyConfig,
     CutoffPolicy,
@@ -34,9 +37,11 @@ from django_bizcal import (
     SameBusinessDayPolicyConfig,
     TimeInput,
     TimeWindow,
+    TimezoneError,
     TzInput,
     UnionCalendar,
     UnionCalendarConfig,
+    ValidationError,
     WorkingCalendar,
     WorkingCalendarConfig,
     breach_at,
@@ -57,8 +62,11 @@ EXPECTED_ROOT_PUBLIC_API = {
     "BusinessDurationPolicy",
     "BusinessDurationPolicyConfig",
     "BusinessInterval",
+    "BizcalError",
     "CalendarBuilder",
     "CalendarConfig",
+    "CalendarConfigurationError",
+    "CalendarRangeError",
     "CloseOfBusinessPolicy",
     "CloseOfBusinessPolicyConfig",
     "CutoffPolicy",
@@ -81,9 +89,11 @@ EXPECTED_ROOT_PUBLIC_API = {
     "SameBusinessDayPolicyConfig",
     "TimeInput",
     "TimeWindow",
+    "TimezoneError",
     "TzInput",
     "UnionCalendar",
     "UnionCalendarConfig",
+    "ValidationError",
     "WorkingCalendar",
     "WorkingCalendarConfig",
     "breach_at",
@@ -105,8 +115,11 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert BusinessDurationPolicy is not None
     assert BusinessDurationPolicyConfig is not None
     assert BusinessInterval is not None
+    assert BizcalError is not None
     assert CalendarBuilder is not None
     assert CalendarConfig is not None
+    assert CalendarConfigurationError is not None
+    assert CalendarRangeError is not None
     assert CloseOfBusinessPolicy is not None
     assert CloseOfBusinessPolicyConfig is not None
     assert CutoffPolicy is not None
@@ -128,9 +141,11 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert SameBusinessDayPolicyConfig is not None
     assert TimeInput is not None
     assert TimeWindow is not None
+    assert TimezoneError is not None
     assert TzInput is not None
     assert UnionCalendar is not None
     assert UnionCalendarConfig is not None
+    assert ValidationError is not None
     assert WorkingCalendar is not None
     assert WorkingCalendarConfig is not None
     assert breach_at is not None

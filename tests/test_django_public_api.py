@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import django_bizcal.django_api as django_api
 from django_bizcal.django_api import (
+    BizcalError,
     BusinessDaysAtClosePolicy,
     BusinessDaysPolicy,
     BusinessDeadline,
     BusinessDurationPolicy,
+    CalendarConfigurationError,
     CalendarDayOverride,
     CalendarDayOverrideWindow,
     CalendarHoliday,
+    CalendarRangeError,
     CalendarResolution,
     CloseOfBusinessPolicy,
     CutoffPolicy,
@@ -19,6 +22,8 @@ from django_bizcal.django_api import (
     DeadlinePolicyResolution,
     NextBusinessDayPolicy,
     SameBusinessDayPolicy,
+    TimezoneError,
+    ValidationError,
     activate_calendar_day_override,
     activate_calendar_holiday,
     apply_database_holiday_overrides,
@@ -72,6 +77,9 @@ EXPECTED_DJANGO_PUBLIC_API = {
     "BusinessDaysPolicy",
     "BusinessDeadline",
     "BusinessDurationPolicy",
+    "BizcalError",
+    "CalendarConfigurationError",
+    "CalendarRangeError",
     "CloseOfBusinessPolicy",
     "CutoffPolicy",
     "DatabaseDayOverrideProvider",
@@ -121,6 +129,8 @@ EXPECTED_DJANGO_PUBLIC_API = {
     "set_calendar_holiday",
     "sync_calendar_day_overrides",
     "sync_calendar_holidays",
+    "TimezoneError",
+    "ValidationError",
 }
 
 
@@ -129,9 +139,12 @@ def test_django_api_exports_stable_helpers() -> None:
     assert BusinessDaysPolicy is not None
     assert BusinessDeadline is not None
     assert BusinessDurationPolicy is not None
+    assert BizcalError is not None
     assert CalendarDayOverride is not None
     assert CalendarDayOverrideWindow is not None
     assert CalendarHoliday is not None
+    assert CalendarConfigurationError is not None
+    assert CalendarRangeError is not None
     assert CalendarResolution is not None
     assert DeadlinePolicyResolution is not None
     assert CloseOfBusinessPolicy is not None
@@ -183,4 +196,6 @@ def test_django_api_exports_stable_helpers() -> None:
     assert set_calendar_holiday is not None
     assert sync_calendar_day_overrides is not None
     assert sync_calendar_holidays is not None
+    assert TimezoneError is not None
+    assert ValidationError is not None
     assert set(django_api.__all__) == EXPECTED_DJANGO_PUBLIC_API

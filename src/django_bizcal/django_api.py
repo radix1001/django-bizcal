@@ -15,6 +15,13 @@ from .deadlines import (
     is_breached,
     remaining_business_time,
 )
+from .exceptions import (
+    BizcalError,
+    CalendarConfigurationError,
+    CalendarRangeError,
+    TimezoneError,
+    ValidationError,
+)
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
 from .policies import (
     BusinessDaysAtClosePolicy,
@@ -74,6 +81,9 @@ __all__ = [
     "BusinessDaysPolicy",
     "BusinessDeadline",
     "BusinessDurationPolicy",
+    "BizcalError",
+    "CalendarConfigurationError",
+    "CalendarRangeError",
     "CloseOfBusinessPolicy",
     "CutoffPolicy",
     "DatabaseDayOverrideProvider",
@@ -123,4 +133,6 @@ __all__ = [
     "set_calendar_holiday",
     "sync_calendar_day_overrides",
     "sync_calendar_holidays",
+    "TimezoneError",
+    "ValidationError",
 ]

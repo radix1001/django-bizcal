@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.1
+
+- Narrowed the supported Django dependency range to maintained upstream releases from Django `5.2` through `6.0`, and removed Django `4.2` from the tested support matrix ahead of `1.0.0`.
+- Promoted the library exception hierarchy to the stable package-level API so consumers can catch `BizcalError`, `ValidationError`, `CalendarConfigurationError`, `CalendarRangeError`, and `TimezoneError` without importing internal modules.
+- Aligned the README and Django integration guides around the documented stable import surfaces, replacing official examples that still imported from internal `services` and `models` modules.
+- Tightened the stability guide to reflect the actual stable surfaces and the current maintained-runtime policy, and refreshed release docs to avoid stale tag examples.
+
 ## 0.10.0
 
 - Expanded the supported Django dependency range to cover modern maintained releases up through Django `6.0`, and updated package metadata to advertise Django `4.2`, `5.2`, and `6.0` plus Python `3.14`.

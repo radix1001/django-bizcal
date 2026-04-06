@@ -93,7 +93,7 @@ Official reference:
 
 1. Update version and changelog
 2. Push changes to `main`
-3. Create and push a tag like `v0.3.0`
+3. Create and push a tag like `vX.Y.Z`
 4. Create a GitHub Release for that tag
 5. The `Publish` workflow builds, validates, and uploads the distributions to PyPI
 
@@ -101,8 +101,8 @@ Typical command sequence:
 
 ```bash
 git push origin main
-git tag -a v0.3.0 -m "Release v0.3.0"
-git push origin v0.3.0
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 ## Fallback manual publishing

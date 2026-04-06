@@ -1,8 +1,27 @@
 # Upgrading
 
+## 0.10.1
+
+`0.10.1` finishes the pre-`1.0.0` API-contract cleanup.
+
+Compatibility changes:
+
+- the package dependency range now targets maintained Django releases from `5.2` through `6.0`
+- Django `4.2` is removed from the advertised and tested support matrix
+
+Public API changes:
+
+- `BizcalError`, `ValidationError`, `CalendarConfigurationError`, `CalendarRangeError`, and `TimezoneError` are now exported from the stable package-level API
+- the official Django integration docs now consistently use `django_bizcal.django_api` instead of internal module imports
+
+Upgrade guidance:
+
+- if your project is still pinned to Django `4.2`, stay on `0.10.0` until you upgrade Django
+- prefer `from django_bizcal import ...` and `from django_bizcal.django_api import ...` in application code going forward
+
 ## 0.10.0
 
-`0.10.0` is the final hardening step before `1.0.0`.
+`0.10.0` was the broad compatibility and release-hardening step that set up the final pre-`1.0.0` polish releases.
 
 Compatibility changes:
 
