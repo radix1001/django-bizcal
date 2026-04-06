@@ -10,3 +10,4 @@ dist-pypi*/
 *.pyc
 .DS_Store
 .venv/
+.venv-*/

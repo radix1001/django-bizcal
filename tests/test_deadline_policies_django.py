@@ -142,6 +142,29 @@ def test_contextual_deadline_policy_resolution_supports_config_and_cache(setting
     assert acme_third is not acme_first
 
 
+def test_get_deadline_policy_for_does_not_cache_contextual_configs_without_cache_key(
+    settings,
+) -> None:
+    settings.TIME_ZONE = "UTC"
+
+    def uncached_policy_resolver(*, context, bizcal_settings):
+        priority = str(context["priority"]).strip().lower()
+        return {
+            "type": "business_duration",
+            "business_hours": 4 if priority == "critical" else 8,
+        }
+
+    settings.BIZCAL_DEADLINE_POLICY_RESOLVER = uncached_policy_resolver
+    reset_calendar_cache()
+
+    first = get_deadline_policy_for(priority="critical")
+    second = get_deadline_policy_for(priority="critical")
+
+    assert first is not second
+    assert isinstance(first, BusinessDurationPolicy)
+    assert isinstance(second, BusinessDurationPolicy)
+
+
 def test_compute_deadline_supports_contextual_calendar_resolution(settings) -> None:
     settings.BIZCAL_DEFAULT_TIMEZONE = "UTC"
     settings.BIZCAL_DEFAULT_CALENDAR_NAME = "default"
@@ -230,6 +253,32 @@ def test_compute_deadline_rejects_mixed_explicit_and_contextual_calendar_inputs(
             calendar=get_default_calendar(),
             tenant="acme",
         )
+
+
+def test_compute_deadline_accepts_explicit_calendar_without_context(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
+    settings.BIZCAL_CALENDARS = {
+        "support": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"0": [["09:00", "18:00"]]},
+        }
+    }
+    settings.BIZCAL_DEADLINE_POLICIES = {
+        "support_p1": {"type": "business_duration", "business_hours": 4},
+    }
+    reset_calendar_cache()
+
+    deadline = compute_deadline(
+        "support_p1",
+        datetime(2026, 3, 2, 10, 0, tzinfo=ZoneInfo("UTC")),
+        calendar=get_default_calendar(),
+        calendar_name="manual-support",
+    )
+
+    assert deadline.deadline == datetime(2026, 3, 2, 14, 0, tzinfo=ZoneInfo("UTC"))
+    assert deadline.calendar_name == "manual-support"
 
 
 def test_contextual_deadline_policy_resolution_validates_configuration(settings) -> None:

@@ -115,6 +115,15 @@ def test_calendar_holiday_service_helpers_support_activate_and_deactivate() -> N
     assert reactivated.name == "Shutdown"
 
 
+def test_deactivate_calendar_holiday_is_noop_when_already_inactive() -> None:
+    set_calendar_holiday("support", "2026-12-24", name="Shutdown", is_active=False)
+
+    holiday = deactivate_calendar_holiday("support", "2026-12-24")
+
+    assert holiday is not None
+    assert holiday.is_active is False
+
+
 def test_sync_calendar_holidays_sets_the_exact_active_set() -> None:
     set_calendar_holiday("support", "2026-12-24", name="Shutdown")
     set_calendar_holiday("support", "2026-12-31", name="Year end")

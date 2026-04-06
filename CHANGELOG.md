@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+
+- Expanded the supported Django dependency range to cover modern maintained releases up through Django `6.0`, and updated package metadata to advertise Django `4.2`, `5.2`, and `6.0` plus Python `3.14`.
+- Reworked CI into a release-quality pipeline with a dedicated quality job for `ruff`, `mypy`, `build`, and `twine check`, plus an explicit supported Django/Python test matrix instead of an unsupported cartesian product.
+- Added a stability and support guide documenting the stable import surfaces, tested runtime policy, and the intended backward-compatibility contract for `1.x`.
+- Hardened pre-`1.0.0` behavior with additional coverage for builder serialization edges, deadline-policy serialization and validation, uncached contextual resolution paths, and Django persistence helper edge cases.
+- Added a reproducible benchmark script for hot calendar paths to make performance validation easier before future releases.
+
 ## 0.9.0
 
 - Added bounded per-instance memoization of local business windows so repeated day, range, and business-time queries reuse previously computed intervals without changing calendar semantics.

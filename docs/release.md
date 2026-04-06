@@ -144,3 +144,4 @@ Official reference:
 - Follow semver starting at `0.1.0`
 - Keep the root package imports stable for v1 users
 - Record user-visible changes in `CHANGELOG.md`
+- Keep `docs/stability.md` aligned with the tested support matrix before each release

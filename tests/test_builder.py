@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -233,7 +233,12 @@ def test_builder_serializes_supported_holiday_provider_shapes() -> None:
     official_only = WorkingCalendar(
         tz="UTC",
         weekly_schedule={0: [("09:00", "18:00")]},
-        holiday_provider=HolidaysProvider.from_country("CL", years=[2026], observed=False),
+        holiday_provider=HolidaysProvider.from_country(
+            "CL",
+            years=[2026],
+            subdivision="RM",
+            observed=False,
+        ),
     )
     extra_only = WorkingCalendar(
         tz="UTC",
@@ -251,7 +256,10 @@ def test_builder_serializes_supported_holiday_provider_shapes() -> None:
         ),
     )
 
-    assert CalendarBuilder.to_dict(official_only)["observed"] is False
+    official_config = CalendarBuilder.to_dict(official_only)
+
+    assert official_config["observed"] is False
+    assert official_config["subdivision"] == "RM"
     assert CalendarBuilder.to_dict(extra_only)["extra_holidays"] == ["2026-03-02"]
     assert CalendarBuilder.to_dict(mixed)["country"] == "CL"
 
@@ -288,3 +296,27 @@ def test_builder_to_dict_rejects_unsupported_shapes() -> None:
         CalendarBuilder.to_dict(multiple_official)
     with pytest.raises(CalendarConfigurationError):
         CalendarBuilder.to_dict(unsupported_provider)
+
+    direct_unsupported_provider = WorkingCalendar(
+        tz="UTC",
+        weekly_schedule={0: [("09:00", "18:00")]},
+        holiday_provider=AdHocHolidayProvider(),  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(CalendarConfigurationError):
+        CalendarBuilder.to_dict(direct_unsupported_provider)
+
+
+def test_builder_to_dict_serializes_time_values_with_seconds() -> None:
+    calendar = WorkingCalendar(
+        tz="UTC",
+        weekly_schedule={0: [(time(9, 0, 15), time(18, 0, 45))]},
+        day_overrides={date(2026, 3, 2): [(time(10, 30, 5), time(12, 45, 10))]},
+    )
+
+    serialized = CalendarBuilder.to_dict(calendar)
+
+    assert serialized["weekly_schedule"] == {"0": [("09:00:15", "18:00:45")]}
+    assert serialized["day_overrides"] == {
+        "2026-03-02": [("10:30:05", "12:45:10")]
+    }

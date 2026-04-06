@@ -536,13 +536,15 @@ See the full documentation in:
 - [`docs/api.md`](docs/api.md)
 - [`docs/django-integration.md`](docs/django-integration.md)
 - [`docs/production.md`](docs/production.md)
+- [`docs/stability.md`](docs/stability.md)
 - [`docs/upgrading.md`](docs/upgrading.md)
 - [`docs/release.md`](docs/release.md)
 
 ## Compatibility
 
 - Python 3.11+
-- Django 4.2, 5.0, 5.1
+- Officially tested against Django 4.2 LTS, 5.2 LTS, and 6.0
+- CI covers the supported upstream Python and Django combinations documented in [`docs/stability.md`](docs/stability.md)
 
 ## Limitations
 

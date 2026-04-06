@@ -99,6 +99,33 @@ def test_get_calendar_for_supports_contextual_config_resolution_and_cache(settin
     )
 
 
+def test_get_calendar_for_does_not_cache_contextual_configs_without_cache_key(settings) -> None:
+    settings.BIZCAL_DEFAULT_TIMEZONE = "UTC"
+    settings.BIZCAL_DEFAULT_CALENDAR_NAME = "default"
+
+    def uncached_calendar_resolver(*, context, bizcal_settings):
+        tenant = str(context["tenant"]).strip().lower()
+        return CalendarResolution.for_config(
+            {
+                "type": "working",
+                "tz": "UTC",
+                "name": f"tenant:{tenant}",
+                "weekly_schedule": {"0": [["09:00", "18:00"]]},
+            },
+            name=f"tenant:{tenant}",
+        )
+
+    settings.BIZCAL_CALENDAR_RESOLVER = uncached_calendar_resolver
+    reset_calendar_cache()
+
+    first = get_calendar_for(tenant="acme")
+    second = get_calendar_for(tenant="acme")
+
+    assert first is not second
+    assert first.calendar_name == "tenant:acme"
+    assert second.calendar_name == "tenant:acme"
+
+
 @pytest.mark.django_db
 def test_contextual_resolution_applies_db_overrides_and_named_invalidation(settings) -> None:
     settings.BIZCAL_ENABLE_DB_MODELS = True

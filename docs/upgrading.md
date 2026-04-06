@@ -1,5 +1,21 @@
 # Upgrading
 
+## 0.10.0
+
+`0.10.0` is the final hardening step before `1.0.0`.
+
+Compatibility changes:
+
+- the package dependency range now allows Django releases through `6.0`
+- package metadata now advertises Django `4.2`, `5.2`, and `6.0`
+- package metadata now advertises Python `3.14`
+
+Project guidance:
+
+- see `docs/stability.md` for the stable import surfaces and the tested support matrix
+- CI now validates `ruff`, `mypy`, `build`, and `twine check` outside the test matrix, so release readiness is checked continuously
+- use `examples/performance_benchmark.py` when you want a quick local signal for hot-path performance after changes
+
 ## 0.7.0
 
 `0.7.0` expanded the deadline-policy layer with `BusinessDaysPolicy`.

@@ -35,6 +35,11 @@ def test_business_duration_policy_resolves_like_deadline_helper(
     assert deadline.service_time == timedelta(hours=4)
 
 
+def test_business_duration_policy_rejects_negative_service_time() -> None:
+    with pytest.raises(ValidationError):
+        BusinessDurationPolicy(timedelta(hours=-1))
+
+
 def test_close_of_business_policy_rolls_forward_when_needed(
     support_calendar: WorkingCalendar,
 ) -> None:
@@ -281,6 +286,46 @@ def test_deadline_policy_builder_serializes_normalized_time_values() -> None:
         "at": "13:30:15",
     }
 
+    assert DeadlinePolicyBuilder.to_dict(NextBusinessDayPolicy(at="opening", tz="UTC")) == {
+        "type": "next_business_day",
+        "at": "opening",
+        "tz": "UTC",
+    }
+    assert DeadlinePolicyBuilder.to_dict(
+        BusinessDaysPolicy(
+            business_days=2,
+            at="opening",
+            include_start=True,
+            tz="UTC",
+        )
+    ) == {
+        "type": "business_days",
+        "business_days": 2,
+        "at": "opening",
+        "include_start": True,
+        "tz": "UTC",
+    }
+    assert DeadlinePolicyBuilder.to_dict(
+        BusinessDaysAtClosePolicy(business_days=2, include_start=True, tz="UTC")
+    ) == {
+        "type": "business_days_at_close",
+        "business_days": 2,
+        "include_start": True,
+        "tz": "UTC",
+    }
+    assert DeadlinePolicyBuilder.to_dict(
+        BusinessDurationPolicy(timedelta(minutes=90))
+    ) == {
+        "type": "business_duration",
+        "business_minutes": 90,
+    }
+    assert DeadlinePolicyBuilder.to_dict(
+        BusinessDurationPolicy(timedelta(minutes=90, seconds=30))
+    ) == {
+        "type": "business_duration",
+        "business_hours": 1.5083333333333333,
+    }
+
 
 def test_calendar_policy_methods_resolve_objects_and_dicts(
     support_calendar: WorkingCalendar,
@@ -333,6 +378,21 @@ def test_deadline_policy_builder_validates_invalid_configs() -> None:
             }
         )
     with pytest.raises(ValidationError):
+        DeadlinePolicyBuilder.from_dict(
+            {
+                "type": "cutoff",
+                "cutoff": "15:00",
+                "before": {"type": "close_of_business"},
+                "after": "next_business_day",
+            }
+        )
+    with pytest.raises(ValidationError):
         BusinessDaysPolicy(business_days=0)
     with pytest.raises(ValidationError):
         BusinessDaysAtClosePolicy(business_days=0)
+
+    class UnsupportedPolicy:
+        pass
+
+    with pytest.raises(ValidationError):
+        DeadlinePolicyBuilder.to_dict(UnsupportedPolicy())  # type: ignore[arg-type]

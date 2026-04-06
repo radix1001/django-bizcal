@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from django_bizcal.exceptions import CalendarConfigurationError
 from django_bizcal.services import reset_calendar_cache, reset_deadline_policy_cache
 from django_bizcal.settings import DEFAULT_WEEKLY_SCHEDULE, get_bizcal_settings
 
@@ -120,6 +121,32 @@ def test_settings_reject_invalid_deadline_policy_resolver(settings) -> None:
 
     with pytest.raises(ValueError):
         get_bizcal_settings()
+
+
+def test_settings_reject_invalid_deadline_policy_mapping_shapes(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEADLINE_POLICIES = []
+    reset_calendar_cache()
+
+    with pytest.raises(ValueError):
+        get_bizcal_settings()
+
+    settings.BIZCAL_DEADLINE_POLICIES = {"support": []}
+    reset_calendar_cache()
+
+    with pytest.raises(ValueError):
+        get_bizcal_settings()
+
+
+def test_settings_raise_clear_error_for_unknown_deadline_policy(settings) -> None:
+    settings.TIME_ZONE = "UTC"
+    settings.BIZCAL_DEADLINE_POLICIES = {
+        "support": {"type": "business_duration", "business_hours": 4}
+    }
+    reset_calendar_cache()
+
+    with pytest.raises(CalendarConfigurationError):
+        get_bizcal_settings().get_deadline_policy_config("missing")
 
 
 def test_global_cache_reset_reloads_settings_objects(settings) -> None:

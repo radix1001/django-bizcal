@@ -300,6 +300,50 @@ def test_day_override_service_helpers_support_crud_and_sync() -> None:
     assert delete_calendar_day_override("support", "2026-12-31") is True
 
 
+def test_activate_calendar_day_override_can_replace_windows_while_reactivating() -> None:
+    set_calendar_day_override(
+        "support",
+        "2026-12-24",
+        [("10:00", "12:00")],
+        is_active=False,
+    )
+
+    override = activate_calendar_day_override(
+        "support",
+        "2026-12-24",
+        windows=[("15:00", "16:00")],
+        name="Late handoff",
+    )
+
+    assert override.is_active is True
+    assert override.name == "Late handoff"
+    assert get_calendar_day_override_windows("support", "2026-12-24") == (
+        get_calendar_day_override_windows("support", "2026-12-24")[0],
+    )
+    assert get_calendar_day_override_windows("support", "2026-12-24")[0].start == time(15, 0)
+    assert get_calendar_day_override_windows("support", "2026-12-24")[0].end == time(16, 0)
+
+
+def test_day_override_helpers_handle_inactive_rows_during_deactivate_and_sync() -> None:
+    set_calendar_day_override(
+        "support",
+        "2026-12-24",
+        [("10:00", "12:00")],
+        is_active=False,
+    )
+
+    existing = deactivate_calendar_day_override("support", "2026-12-24")
+    synced = sync_calendar_day_overrides(
+        "support",
+        {"2026-12-24": [("11:00", "13:00")]},
+    )
+
+    assert existing is not None
+    assert existing.is_active is False
+    assert synced[0].is_active is True
+    assert get_calendar_day_override_windows("support", "2026-12-24")[0].start == time(11, 0)
+
+
 def test_day_override_helpers_invalidate_only_the_affected_named_calendar(settings) -> None:
     settings.BIZCAL_ENABLE_DB_MODELS = True
     settings.BIZCAL_DEFAULT_CALENDAR_NAME = "support"
