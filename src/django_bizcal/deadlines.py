@@ -193,13 +193,34 @@ def _resolve_day_deadline(
     if at == "opening":
         resolved = intervals[0].start
     elif at == "closing":
-        resolved = intervals[-1].end
+        resolved = _closing_boundary(day, calendar=calendar, intervals=intervals)
     else:
         candidate = datetime.combine(day, _coerce_deadline_time(at), tzinfo=calendar.tz)
         resolved = _snap_candidate_within_day(candidate, intervals)
     if tz is None:
         return resolved
     return resolved.astimezone(_resolve_render_tz(tz))
+
+
+def _closing_boundary(
+    day: date,
+    *,
+    calendar: BusinessCalendar,
+    intervals: tuple[BusinessInterval, ...],
+) -> datetime:
+    """Return the day's closing boundary, following an overnight block past midnight.
+
+    Calendars that anchor work blocks to their starting day report the real closing
+    time of an overnight shift. On composite calendars, whose children already report
+    coverage clipped to civil days, the closing of an overnight block is midnight.
+    """
+    from .calendars.working import WorkingCalendar
+
+    if isinstance(calendar, WorkingCalendar):
+        blocks = calendar.business_blocks_for_day(day)
+        if blocks:
+            return blocks[-1].end
+    return intervals[-1].end
 
 
 def _coerce_deadline_time(value: TimeInput) -> time:

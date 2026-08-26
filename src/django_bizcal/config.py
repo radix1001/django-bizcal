@@ -9,7 +9,8 @@ from typing import (
     TypedDict,
 )
 
-TimePairConfig: TypeAlias = tuple[str, str]
+TimePairConfig: TypeAlias = tuple[str, str] | tuple[str, str, int]
+"""A `(start, end)` pair, or `(start, end, end_offset_days)` for overnight blocks."""
 WeeklyScheduleConfig: TypeAlias = dict[int | str, list[TimePairConfig]]
 DayOverrideConfig: TypeAlias = dict[str, list[TimePairConfig] | None]
 
@@ -28,6 +29,7 @@ class WorkingCalendarConfig(TypedDict):
     custom_holidays: NotRequired[list[str]]
     day_overrides: NotRequired[DayOverrideConfig]
     name: NotRequired[str]
+    holiday_truncates_overnight: NotRequired[bool]
 
 
 class UnionCalendarConfig(TypedDict):

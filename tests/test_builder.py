@@ -320,3 +320,67 @@ def test_builder_to_dict_serializes_time_values_with_seconds() -> None:
     assert serialized["day_overrides"] == {
         "2026-03-02": [("10:30:05", "12:45:10")]
     }
+
+
+def test_builder_round_trips_an_overnight_calendar() -> None:
+    config = {
+        "type": "working",
+        "tz": "UTC",
+        "weekly_schedule": {"0": [["22:00", "06:00", 1]]},
+        "day_overrides": {"2026-03-09": [["20:00", "04:00", 1]]},
+        "holiday_truncates_overnight": True,
+    }
+
+    calendar = CalendarBuilder.from_dict(config)
+    assert isinstance(calendar, WorkingCalendar)
+    serialized = CalendarBuilder.to_dict(calendar)
+
+    assert serialized["weekly_schedule"] == {"0": [("22:00", "06:00", 1)]}
+    assert serialized["day_overrides"] == {"2026-03-09": [("20:00", "04:00", 1)]}
+    assert serialized["holiday_truncates_overnight"] is True
+
+    rebuilt = CalendarBuilder.from_dict(serialized)
+    assert isinstance(rebuilt, WorkingCalendar)
+    assert rebuilt.weekly_schedule == calendar.weekly_schedule
+    assert rebuilt.day_overrides == calendar.day_overrides
+    assert rebuilt.holiday_truncates_overnight is True
+    assert CalendarBuilder.to_dict(rebuilt) == serialized
+
+
+def test_builder_keeps_the_plain_time_pair_shape_without_overnight_blocks() -> None:
+    calendar = WorkingCalendar(
+        tz="UTC",
+        weekly_schedule={0: [("09:00", "18:00")], 1: [("09:00", "13:00"), ("14:00", "18:00")]},
+        day_overrides={date(2026, 3, 2): [("10:00", "12:00")], date(2026, 3, 3): None},
+    )
+
+    serialized = CalendarBuilder.to_dict(calendar)
+
+    assert serialized["weekly_schedule"] == {
+        "0": [("09:00", "18:00")],
+        "1": [("09:00", "13:00"), ("14:00", "18:00")],
+    }
+    assert serialized["day_overrides"] == {
+        "2026-03-02": [("10:00", "12:00")],
+        "2026-03-03": None,
+    }
+    assert "holiday_truncates_overnight" not in serialized
+
+
+def test_builder_round_trips_an_overnight_override_calendar() -> None:
+    config = {
+        "type": "override",
+        "tz": "UTC",
+        "base": {
+            "type": "working",
+            "tz": "UTC",
+            "weekly_schedule": {"0": [["09:00", "18:00"]]},
+        },
+        "overrides": {"2026-03-02": [["22:00", "06:00", 1]]},
+    }
+
+    calendar = CalendarBuilder.from_dict(config)
+    serialized = CalendarBuilder.to_dict(calendar)
+
+    assert serialized["overrides"] == {"2026-03-02": [("22:00", "06:00", 1)]}
+    assert CalendarBuilder.to_dict(CalendarBuilder.from_dict(serialized)) == serialized

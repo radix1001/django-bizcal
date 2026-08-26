@@ -375,3 +375,99 @@ def test_day_override_helpers_invalidate_only_the_affected_named_calendar(settin
     assert len(windows) == 1
     assert windows[0].start == datetime(2026, 12, 24, 10, 0, tzinfo=ZoneInfo("UTC"))
     assert windows[0].end == datetime(2026, 12, 24, 12, 0, tzinfo=ZoneInfo("UTC"))
+
+
+def test_persisted_overnight_day_override_round_trips_and_materializes() -> None:
+    from django_bizcal import WorkingCalendar
+
+    set_calendar_day_override("support", "2026-03-02", [("22:00", "06:00", 1)])
+
+    blocks = get_calendar_day_override_windows("support", "2026-03-02")
+    assert blocks is not None
+    assert len(blocks) == 1
+    assert blocks[0].start == time(22, 0)
+    assert blocks[0].end == time(6, 0)
+    assert blocks[0].end_offset_days == 1
+
+    rows = list(
+        CalendarDayOverrideWindow.objects.filter(override__calendar_name="support").order_by(
+            "position"
+        )
+    )
+    assert [(row.start_time, row.end_time, row.end_offset_days) for row in rows] == [
+        (time(22, 0), time(6, 0), 1)
+    ]
+
+    resolved = apply_database_overrides(
+        WorkingCalendar(tz="UTC", weekly_schedule={0: [("09:00", "18:00")]}),
+        calendar_name="support",
+    )
+    monday = resolved.business_windows_for_day(date(2026, 3, 2))
+    tuesday = resolved.business_windows_for_day(date(2026, 3, 3))
+
+    assert monday[0].start == datetime(2026, 3, 2, 22, 0, tzinfo=ZoneInfo("UTC"))
+    assert monday[0].end == datetime(2026, 3, 3, 0, 0, tzinfo=ZoneInfo("UTC"))
+    assert tuesday[0].end == datetime(2026, 3, 3, 6, 0, tzinfo=ZoneInfo("UTC"))
+
+
+def test_day_override_window_check_constraint_encodes_the_24_hour_rule() -> None:
+    override = CalendarDayOverride.objects.create(calendar_name="support", day=date(2026, 3, 2))
+
+    with transaction.atomic():
+        with pytest.raises(IntegrityError):
+            CalendarDayOverrideWindow.objects.create(
+                override=override,
+                start_time=time(22, 0),
+                end_time=time(23, 0),
+                end_offset_days=1,
+                position=0,
+            )
+    with transaction.atomic():
+        with pytest.raises(IntegrityError):
+            CalendarDayOverrideWindow.objects.create(
+                override=override,
+                start_time=time(22, 0),
+                end_time=time(6, 0),
+                end_offset_days=0,
+                position=1,
+            )
+
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(22, 0),
+        end_time=time(6, 0),
+        end_offset_days=1,
+        position=2,
+    )
+
+    assert CalendarDayOverrideWindow.objects.filter(override=override).count() == 1
+
+
+def test_activate_day_override_preserves_the_persisted_end_offset() -> None:
+    set_calendar_day_override(
+        "support",
+        "2026-03-02",
+        [("22:00", "06:00", 1)],
+        is_active=False,
+    )
+
+    reactivated = activate_calendar_day_override("support", "2026-03-02")
+    blocks = get_calendar_day_override_windows("support", "2026-03-02")
+
+    assert reactivated.is_active is True
+    assert blocks is not None
+    assert blocks[0].end_offset_days == 1
+
+
+def test_day_override_admin_summary_marks_overnight_windows() -> None:
+    override = CalendarDayOverride.objects.create(calendar_name="support", day=date(2026, 3, 2))
+    CalendarDayOverrideWindow.objects.create(
+        override=override,
+        start_time=time(22, 0),
+        end_time=time(6, 0),
+        end_offset_days=1,
+        position=0,
+    )
+    admin_instance = admin.site._registry[CalendarDayOverride]
+
+    assert admin_instance.window_summary(override) == "22:00-06:00+1d"

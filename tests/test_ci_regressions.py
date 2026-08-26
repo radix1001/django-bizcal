@@ -300,7 +300,7 @@ def test_admin_helpers_cover_save_delete_and_noop_branches(
     assert reset_calls == ["support"]
 
     reset_calls.clear()
-    captured: list[tuple[tuple[time, time], ...]] = []
+    captured: list[tuple[tuple[time, time, int], ...]] = []
     monkeypatch.setattr(
         "django_bizcal.admin.replace_day_override_windows",
         lambda obj, windows, *, using: captured.append(tuple(windows)),
@@ -316,7 +316,7 @@ def test_admin_helpers_cover_save_delete_and_noop_branches(
         formsets=[],
         change=True,
     )
-    assert captured == [((time(9, 0), time(11, 0)),)]
+    assert captured == [((time(9, 0), time(11, 0), 0),)]
     assert reset_calls == ["support"]
 
     reset_calls.clear()

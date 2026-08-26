@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.0
+
+- Added `ScheduleBlock` and `build_schedule_blocks(...)` so a work block can start on one day and end on the next, making overnight shifts such as `22:00 -> 06:00` expressible as a single block instead of two windows separated by a one-second gap at midnight.
+- Made overnight business-time arithmetic exact: `business_time_between(...)`, `add_business_time(...)` and friends now measure a night shift as the full elapsed time, and `business_windows_for_range(...)` returns the night as one merged interval.
+- Anchored day-oriented queries to civil days: `business_windows_for_day(...)` clips a block that crosses midnight so adjacent days tile the timeline exactly, `is_business_day(...)` is `True` for a day covered only by the incoming tail, and `WorkingCalendar.business_blocks_for_day(...)` exposes whole unclipped blocks anchored to their starting day.
+- Added `WorkingCalendar(holiday_truncates_overnight=...)`, defaulting to `False`, so a closed day suppresses only the blocks that start on it and an already-running night shift survives into a holiday morning.
+- Extended declarative configuration and persistence with the third `end_offset_days` element, including `CalendarDayOverrideWindow.end_offset_days`, migration `0003_overnight_blocks`, and a check constraint that encodes the 24-hour bound in the database.
+- Routed `at="closing"` deadline resolution through the anchored blocks, so a close-of-business deadline on an overnight shift lands at the real closing time on the following day.
+- Fixed civil-day boundary computation so a boundary never carries a local wall clock that does not exist, which previously mattered on a DST forward transition, and fixed the day cursor in business-time addition so a day covered only by an incoming overnight tail is no longer skipped.
+- Backward compatibility: this release is additive except for the element type of `WorkingCalendar.weekly_schedule`, `WorkingCalendar.day_overrides`, and `OverrideCalendar.overrides`, which now hold `ScheduleBlock` instead of `TimeWindow`. `TimeWindow` and its algebra are unchanged and still accepted everywhere a schedule is configured. A calendar without overnight blocks serializes byte for byte as in `0.10.1` and answers every query identically.
+
 ## 0.10.1
 
 - Narrowed the supported Django dependency range to maintained upstream releases from Django `5.2` through `6.0`, and removed Django `4.2` from the tested support matrix ahead of `1.0.0`.

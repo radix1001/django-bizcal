@@ -70,3 +70,38 @@ def test_local_day_window_cache_is_bounded_per_calendar_instance() -> None:
     calendar.business_windows_for_day(start_day)
 
     assert calendar.calls_by_day[start_day] == 2
+
+
+class OvernightCountingCalendar(BusinessCalendar):
+    def __init__(self) -> None:
+        super().__init__("UTC")
+        self.calls_by_day: dict[date, int] = {}
+
+    def _may_span_midnight(self) -> bool:
+        return True
+
+    def _business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
+        self.calls_by_day[day] = self.calls_by_day.get(day, 0) + 1
+        return (
+            BusinessInterval(
+                start=datetime.combine(day, time(22, 0), tzinfo=self.tz),
+                end=datetime.combine(day + timedelta(days=1), time(6, 0), tzinfo=self.tz),
+            ),
+        )
+
+
+def test_clipped_day_window_cache_is_reused_and_bounded() -> None:
+    calendar = OvernightCountingCalendar()
+    day = date(2026, 3, 2)
+
+    first = calendar.business_windows_for_day(day)
+    second = calendar.business_windows_for_day(day)
+
+    assert first is second
+    assert calendar.calls_by_day == {day - timedelta(days=1): 1, day: 1}
+
+    start_day = date(2026, 1, 1)
+    for offset in range(_LOCAL_DAY_WINDOW_CACHE_SIZE + 5):
+        calendar.business_windows_for_day(start_day + timedelta(days=offset))
+
+    assert len(calendar._clipped_day_window_cache) == _LOCAL_DAY_WINDOW_CACHE_SIZE

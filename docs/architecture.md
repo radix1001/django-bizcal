@@ -33,7 +33,7 @@ Modules:
 
 Responsibilities:
 
-- Model wall-clock windows and timezone-aware intervals.
+- Model wall-clock windows, schedule blocks, and timezone-aware intervals.
 - Normalize, merge, intersect, and subtract time windows.
 - Represent working calendars and composed calendars.
 - Compute business-time arithmetic and elapsed business time.
@@ -92,6 +92,8 @@ do not grow without limit.
 The practical effect is:
 
 - repeated day queries on the same calendar instance avoid rebuilding intervals
+- calendars that cannot emit blocks crossing midnight skip the civil-day clipping pass
+  entirely, so they build no extra day windows for a feature they do not use
 - range and business-time operations reuse previously computed day windows
 - Django invalidation still happens by replacing cached calendar instances rather than mutating them in place
 
@@ -139,6 +141,38 @@ Default Django policy:
 - `BIZCAL_PRELOAD_YEARS = 3`
 - Interpreted as current year minus one through current year plus one
 
+## Blocks that cross midnight
+
+An overnight shift is expressed as a `ScheduleBlock` with `end_offset_days=1` rather than
+as a wrap-around `TimeWindow`. The reasoning:
+
+- `TimeWindow` carries a complete intraday algebra (`overlaps`, `touches`, `merge`,
+  `intersection`, `subtract`, and the normalize/intersect/subtract helpers) that assumes a
+  linear order within one day. Adding wrap-around would mean rewriting all of it and every
+  call site.
+- `BusinessInterval` already handles arbitrary timezone-aware intervals, and computes
+  durations in UTC, so DST correctness across a midnight boundary comes for free.
+
+So the rule is: cross-midnight lives in `BusinessInterval`, never in `TimeWindow`.
+`ScheduleBlock` is only a materialization spec, converted to intervals in one place and
+taking no part in the algebra.
+
+The second half of the design is the anchoring rule. Calendars materialize blocks anchored
+to the day on which they start, and the day-oriented public API then clips that coverage to
+civil days, folding in the previous day's tail. Because adjacent civil days tile the
+timeline exactly, with no one-second gap at midnight:
+
+- composition keeps working day by day, unchanged
+- business-time arithmetic sums contiguous segments without losing time
+- `business_windows_for_range(...)` merges the segments back into one interval
+
+The cost is that the identity of a block is only visible on the calendar that owns it, via
+`WorkingCalendar.business_blocks_for_day(...)`. Composites deliberately do not expose it.
+
+Civil-day boundaries are computed as instants and normalized through UTC, so a boundary
+never carries a local wall clock that does not exist — the midnight skipped by a DST
+forward transition, for instance.
+
 ## Composition semantics
 
 - `UnionCalendar`: open if any child is open
@@ -147,6 +181,10 @@ Default Django policy:
 - `OverrideCalendar`: replace the base calendar on specific dates
 
 Overrides are intentionally substitution-based rather than patch-based. A date override replaces the entire day's schedule. This keeps the model easy to reason about and avoids subtle precedence bugs.
+
+That substitution covers the whole civil day, including the tail of an overnight block the
+base calendar started the previous day. `WorkingCalendar`'s own `holiday_truncates_overnight`
+flag is what decides whether a closed day keeps or truncates such a tail.
 
 The same rule applies in Django persistence:
 

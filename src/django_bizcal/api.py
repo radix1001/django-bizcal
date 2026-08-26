@@ -55,7 +55,7 @@ from .policies import (
 )
 from .providers import HolidayProvider
 from .types import DateInput, RenderTzInput, TimeInput, TzInput
-from .windows import TimeWindow
+from .windows import ScheduleBlock, TimeWindow, build_schedule_blocks
 
 __all__ = [
     "BusinessCalendar",
@@ -92,6 +92,7 @@ __all__ = [
     "RenderTzInput",
     "SameBusinessDayPolicy",
     "SameBusinessDayPolicyConfig",
+    "ScheduleBlock",
     "TimeInput",
     "TimeWindow",
     "TimezoneError",
@@ -102,6 +103,7 @@ __all__ = [
     "WorkingCalendar",
     "WorkingCalendarConfig",
     "breach_at",
+    "build_schedule_blocks",
     "business_deadline_at_close",
     "deadline_for",
     "due_on_next_business_day",

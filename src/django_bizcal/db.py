@@ -14,8 +14,7 @@ from .calendars.base import BusinessCalendar
 from .calendars.composite import OverrideCalendar, OverrideInput
 from .exceptions import ValidationError
 from .models import CalendarDayOverride, CalendarDayOverrideWindow, CalendarHoliday
-from .types import TimeInput
-from .windows import TimeWindow, build_time_windows
+from .windows import ScheduleBlock, ScheduleBlockInput, build_schedule_blocks
 
 
 @dataclass(frozen=True)
@@ -70,7 +69,7 @@ class DatabaseDayOverrideProvider:
         )
 
     @cached_property
-    def overrides(self) -> dict[date, tuple[TimeWindow, ...]]:
+    def overrides(self) -> dict[date, tuple[ScheduleBlock, ...]]:
         """Materialized per-day override windows keyed by logical calendar day."""
         queryset = (
             CalendarDayOverride.objects.using(self.using)
@@ -90,8 +89,9 @@ class DatabaseDayOverrideProvider:
         if not self.include_inactive:
             queryset = queryset.filter(is_active=True)
         return {
-            override.day: build_time_windows(
-                (window.start_time, window.end_time) for window in override.windows.all()
+            override.day: build_schedule_blocks(
+                (window.start_time, window.end_time, window.end_offset_days)
+                for window in override.windows.all()
             )
             for override in queryset
         }
@@ -118,14 +118,14 @@ def build_database_override_map(
     *,
     calendar_name: str,
     using: str = "default",
-) -> dict[date, tuple[TimeWindow, ...] | None]:
+) -> dict[date, tuple[ScheduleBlock, ...] | None]:
     """Return merged persisted overrides for a logical calendar name.
 
     Persisted day overrides take precedence over full-day holiday closures on the same date.
     """
     holiday_provider = DatabaseHolidayProvider(calendar_name=calendar_name, using=using)
     day_override_provider = DatabaseDayOverrideProvider(calendar_name=calendar_name, using=using)
-    overrides: dict[date, tuple[TimeWindow, ...] | None] = {
+    overrides: dict[date, tuple[ScheduleBlock, ...] | None] = {
         day: None for day in sorted(holiday_provider.days)
     }
     overrides.update(day_override_provider.overrides)
@@ -147,22 +147,23 @@ def apply_database_overrides(
 
 def replace_day_override_windows(
     override: CalendarDayOverride,
-    windows: Iterable[tuple[TimeInput, TimeInput] | TimeWindow],
+    windows: Iterable[ScheduleBlockInput],
     *,
     using: str = "default",
 ) -> None:
     """Replace a persisted override's windows with normalized ordered rows."""
-    normalized_windows = build_time_windows(windows)
+    normalized_windows = build_schedule_blocks(windows)
     CalendarDayOverrideWindow.objects.using(using).filter(override=override).delete()
     CalendarDayOverrideWindow.objects.using(using).bulk_create(
         [
             CalendarDayOverrideWindow(
                 override=override,
-                start_time=window.start,
-                end_time=window.end,
+                start_time=block.start,
+                end_time=block.end,
+                end_offset_days=block.end_offset_days,
                 position=position,
             )
-            for position, window in enumerate(normalized_windows)
+            for position, block in enumerate(normalized_windows)
         ]
     )
 

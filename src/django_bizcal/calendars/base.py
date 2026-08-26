@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
@@ -20,6 +20,7 @@ from ..types import (
     coerce_zoneinfo,
     ensure_aware,
 )
+from ..windows import ScheduleBlock
 
 _SEARCH_HORIZON_DAYS = 3660
 _LOCAL_DAY_WINDOW_CACHE_SIZE = 512
@@ -33,7 +34,13 @@ if TYPE_CHECKING:
 class BusinessCalendar(ABC):
     """Abstract calendar returning business intervals in a reference timezone."""
 
-    __slots__ = ("_tz", "_calendar_name", "_local_day_window_cache")
+    __slots__ = (
+        "_tz",
+        "_calendar_name",
+        "_local_day_window_cache",
+        "_clipped_day_window_cache",
+        "_resolved_may_span_midnight",
+    )
 
     def __init__(self, tz: TzInput) -> None:
         self._tz = coerce_zoneinfo(tz)
@@ -41,6 +48,10 @@ class BusinessCalendar(ABC):
         self._local_day_window_cache: OrderedDict[date, tuple[BusinessInterval, ...]] = (
             OrderedDict()
         )
+        self._clipped_day_window_cache: OrderedDict[date, tuple[BusinessInterval, ...]] = (
+            OrderedDict()
+        )
+        self._resolved_may_span_midnight: bool | None = None
 
     @property
     def tz(self) -> ZoneInfo:
@@ -54,7 +65,24 @@ class BusinessCalendar(ABC):
 
     @abstractmethod
     def _business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
-        """Return normalized intervals for a local calendar day in the calendar timezone."""
+        """Return normalized intervals anchored to a local calendar day.
+
+        Intervals are anchored to the day on which they start and may end after
+        midnight. Subclasses that emit such intervals must also return `True` from
+        `_may_span_midnight`, so that the public day-oriented API clips them to civil
+        days and picks up the previous day's spillover.
+        """
+
+    def _may_span_midnight(self) -> bool:
+        """Return whether this calendar can emit day intervals that cross midnight.
+
+        Resolved once per instance, since calendars are immutable after construction.
+        """
+        return False
+
+    def _accepts_spillover_into(self, day: date) -> bool:
+        """Return whether the previous day's overnight block may extend into this day."""
+        return True
 
     def business_windows_for_day(
         self,
@@ -66,9 +94,9 @@ class BusinessCalendar(ABC):
         target_tz = self.tz if tz is None else _resolve_render_tz(tz)
         target_day = _coerce_day_in_timezone(day, target_tz)
         if target_tz == self.tz:
-            return self._cached_business_windows_for_day_local(target_day)
-        day_start = datetime.combine(target_day, time.min, tzinfo=target_tz)
-        day_end = day_start + timedelta(days=1)
+            return self._clipped_windows_for_day_local(target_day)
+        day_start = _local_day_start(target_day, target_tz)
+        day_end = _local_day_start(target_day + timedelta(days=1), target_tz)
         return self.business_windows_for_range(day_start, day_end, tz=target_tz)
 
     def business_windows_for_range(
@@ -102,8 +130,12 @@ class BusinessCalendar(ABC):
         return normalize_intervals(intervals)
 
     def is_business_day(self, value: DateInput) -> bool:
-        """Return whether the given calendar day has at least one business interval."""
-        return bool(self._business_windows_for_day_local(_coerce_day_in_timezone(value, self.tz)))
+        """Return whether the given calendar day has at least one business interval.
+
+        A day covered only by the tail of an overnight block started the previous day
+        still counts as a business day.
+        """
+        return bool(self._clipped_windows_for_day_local(_coerce_day_in_timezone(value, self.tz)))
 
     def iter_business_days(
         self,
@@ -197,9 +229,14 @@ class BusinessCalendar(ABC):
         return intervals[-1].end
 
     def next_opening_datetime(self, value: datetime) -> datetime:
-        """Return the next opening boundary at or after the given datetime."""
+        """Return the next opening boundary at or after the given datetime.
+
+        Boundaries are civil-day boundaries: when an overnight block is still open at
+        midnight, the reported "opening" for the following day is midnight itself, not
+        the wall-clock time at which the block originally started.
+        """
         current = ensure_aware(value, param_name="value")
-        target_tzinfo = current.tzinfo
+        target_tzinfo = _require_tzinfo(current)
         current = current.astimezone(target_tzinfo)
         day = current.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
@@ -207,16 +244,21 @@ class BusinessCalendar(ABC):
             for interval in intervals:
                 if current <= interval.start:
                     return interval.start
-            current = datetime.combine(day + timedelta(days=1), time.min, tzinfo=target_tzinfo)
-            day = current.date()
+            day += timedelta(days=1)
+            current = _local_day_start(day, target_tzinfo)
         raise CalendarRangeError(
             "Unable to find the next opening datetime within the search horizon."
         )
 
     def previous_closing_datetime(self, value: datetime) -> datetime:
-        """Return the previous closing boundary at or before the given datetime."""
+        """Return the previous closing boundary at or before the given datetime.
+
+        Boundaries are civil-day boundaries: when an overnight block is still open at
+        midnight, the reported "closing" for the starting day is midnight itself, not
+        the wall-clock time at which the block actually ends.
+        """
         current = ensure_aware(value, param_name="value")
-        target_tzinfo = current.tzinfo
+        target_tzinfo = _require_tzinfo(current)
         current = current.astimezone(target_tzinfo)
         day = current.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
@@ -224,8 +266,8 @@ class BusinessCalendar(ABC):
             for interval in reversed(intervals):
                 if current >= interval.end:
                     return interval.end
-            current = datetime.combine(day - timedelta(days=1), time.max, tzinfo=target_tzinfo)
-            day = current.date()
+            day -= timedelta(days=1)
+            current = min(current, _local_day_end(day, target_tzinfo))
         raise CalendarRangeError(
             "Unable to find the previous closing datetime within the search horizon."
         )
@@ -233,7 +275,7 @@ class BusinessCalendar(ABC):
     def next_business_datetime(self, value: datetime) -> datetime:
         """Return the next business datetime or boundary at or after the given datetime."""
         current = ensure_aware(value, param_name="value")
-        target_tzinfo = current.tzinfo
+        target_tzinfo = _require_tzinfo(current)
         current = current.astimezone(target_tzinfo)
         day = current.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
@@ -243,8 +285,8 @@ class BusinessCalendar(ABC):
                     return current
                 if current < interval.start:
                     return interval.start
-            current = datetime.combine(day + timedelta(days=1), time.min, tzinfo=target_tzinfo)
-            day = current.date()
+            day += timedelta(days=1)
+            current = _local_day_start(day, target_tzinfo)
         raise CalendarRangeError(
             "Unable to find the next business datetime within the search horizon."
         )
@@ -252,7 +294,7 @@ class BusinessCalendar(ABC):
     def previous_business_datetime(self, value: datetime) -> datetime:
         """Return the previous business datetime or closing boundary at or before the input."""
         current = ensure_aware(value, param_name="value")
-        target_tzinfo = current.tzinfo
+        target_tzinfo = _require_tzinfo(current)
         current = current.astimezone(target_tzinfo)
         day = current.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
@@ -262,8 +304,8 @@ class BusinessCalendar(ABC):
                     return current
                 if current > interval.end:
                     return interval.end
-            current = datetime.combine(day - timedelta(days=1), time.max, tzinfo=target_tzinfo)
-            day = current.date()
+            day -= timedelta(days=1)
+            current = min(current, _local_day_end(day, target_tzinfo))
         raise CalendarRangeError(
             "Unable to find the previous business datetime within the search horizon."
         )
@@ -397,9 +439,10 @@ class BusinessCalendar(ABC):
 
     def _add_positive_business_time(self, start: datetime, remaining: timedelta) -> datetime:
         cursor = start if self.is_business_time(start) else self.next_business_datetime(start)
-        target_tzinfo = cursor.tzinfo
+        target_tzinfo = _require_tzinfo(cursor)
+        day = cursor.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
-            intervals = self.business_windows_for_day(cursor.date(), tz=target_tzinfo)
+            intervals = self.business_windows_for_day(day, tz=target_tzinfo)
             for interval in intervals:
                 if cursor < interval.start:
                     cursor = interval.start
@@ -409,18 +452,16 @@ class BusinessCalendar(ABC):
                         return _shift_datetime(cursor, remaining)
                     remaining -= available
                     cursor = interval.end
-            cursor = datetime.combine(
-                cursor.date() + timedelta(days=1),
-                time.min,
-                tzinfo=target_tzinfo,
-            )
+            day += timedelta(days=1)
+            cursor = max(cursor, _local_day_start(day, target_tzinfo))
         raise CalendarRangeError("Unable to add business time within the search horizon.")
 
     def _add_negative_business_time(self, start: datetime, remaining: timedelta) -> datetime:
         cursor = start if self.is_business_time(start) else self.previous_business_datetime(start)
-        target_tzinfo = cursor.tzinfo
+        target_tzinfo = _require_tzinfo(cursor)
+        day = cursor.date()
         for _ in range(_SEARCH_HORIZON_DAYS):
-            intervals = self.business_windows_for_day(cursor.date(), tz=target_tzinfo)
+            intervals = self.business_windows_for_day(day, tz=target_tzinfo)
             for interval in reversed(intervals):
                 segment_end = min(cursor, interval.end)
                 if segment_end < interval.start:
@@ -430,12 +471,48 @@ class BusinessCalendar(ABC):
                     return _shift_datetime(segment_end, -remaining)
                 remaining -= available
                 cursor = interval.start
-            cursor = datetime.combine(
-                cursor.date() - timedelta(days=1),
-                time.max,
-                tzinfo=target_tzinfo,
-            )
+            day -= timedelta(days=1)
+            cursor = min(cursor, _local_day_end(day, target_tzinfo))
         raise CalendarRangeError("Unable to subtract business time within the search horizon.")
+
+    def _clipped_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
+        """Return the calendar-day coverage in the calendar timezone.
+
+        Blocks that cross midnight are clipped to the civil day, and the tail of the
+        previous day's block is included, so adjacent days tile the timeline exactly.
+        """
+        spans_midnight = self._resolved_may_span_midnight
+        if spans_midnight is None:
+            spans_midnight = self._resolved_may_span_midnight = self._may_span_midnight()
+        if not spans_midnight:
+            return self._cached_business_windows_for_day_local(day)
+        cached = self._clipped_day_window_cache.get(day)
+        if cached is not None:
+            self._clipped_day_window_cache.move_to_end(day)
+            return cached
+        windows = self._compute_clipped_windows_for_day_local(day)
+        self._clipped_day_window_cache[day] = windows
+        if len(self._clipped_day_window_cache) > _LOCAL_DAY_WINDOW_CACHE_SIZE:
+            self._clipped_day_window_cache.popitem(last=False)
+        return windows
+
+    def _compute_clipped_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
+        bounds = BusinessInterval(
+            start=_local_day_start(day, self.tz),
+            end=_local_day_end(day, self.tz),
+        )
+        clipped: list[BusinessInterval] = []
+        if self._accepts_spillover_into(day):
+            previous_day = day - timedelta(days=1)
+            for interval in self._cached_business_windows_for_day_local(previous_day):
+                overlap = interval.intersection(bounds)
+                if overlap is not None:
+                    clipped.append(overlap)
+        for interval in self._cached_business_windows_for_day_local(day):
+            overlap = interval.intersection(bounds)
+            if overlap is not None:
+                clipped.append(overlap)
+        return normalize_intervals(clipped)
 
     def _cached_business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
         cached = self._local_day_window_cache.get(day)
@@ -447,6 +524,55 @@ class BusinessCalendar(ABC):
         if len(self._local_day_window_cache) > _LOCAL_DAY_WINDOW_CACHE_SIZE:
             self._local_day_window_cache.popitem(last=False)
         return windows
+
+
+def materialize_schedule_blocks(
+    day: date,
+    blocks: Iterable[ScheduleBlock],
+    tz: tzinfo,
+) -> tuple[BusinessInterval, ...]:
+    """Materialize schedule blocks anchored to a local day into aware intervals.
+
+    Blocks built by `build_schedule_blocks` are already ordered and merged as far as one
+    day allows, so the intervals only need a normalization pass when a block crosses
+    midnight and can therefore still overlap a later block on the same anchor day.
+    """
+    intervals: list[BusinessInterval] = []
+    spans_midnight = False
+    for block in blocks:
+        spans_midnight = spans_midnight or block.spans_midnight
+        intervals.append(
+            BusinessInterval(
+                start=datetime.combine(day, block.start, tzinfo=tz),
+                end=datetime.combine(
+                    day + timedelta(days=block.end_offset_days),
+                    block.end,
+                    tzinfo=tz,
+                ),
+            )
+        )
+    return normalize_intervals(intervals) if spans_midnight else tuple(intervals)
+
+
+def _require_tzinfo(value: datetime) -> tzinfo:
+    """Return the datetime's timezone, which callers have already ensured is set."""
+    current = value.tzinfo
+    assert current is not None
+    return current
+
+
+def _local_day_start(day: date, tzinfo: tzinfo) -> datetime:
+    """Return the instant at which the given local calendar day starts.
+
+    Normalizing through UTC keeps the returned wall clock valid when local midnight
+    does not exist because of a DST forward transition.
+    """
+    return datetime.combine(day, time.min, tzinfo=tzinfo).astimezone(UTC).astimezone(tzinfo)
+
+
+def _local_day_end(day: date, tzinfo: tzinfo) -> datetime:
+    """Return the exclusive end instant of the given local calendar day."""
+    return _local_day_start(day + timedelta(days=1), tzinfo)
 
 
 def _iter_days(start: date, end: date) -> tuple[date, ...]:
