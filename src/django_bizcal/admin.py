@@ -22,7 +22,7 @@ class CalendarDayOverrideWindowInline(admin.TabularInline):  # type: ignore[misc
 
     model = CalendarDayOverrideWindow
     extra = 0
-    fields = ("position", "start_time", "end_time")
+    fields = ("position", "start_time", "end_time", "end_offset_days")
     ordering = ("position", "start_time")
 
 
@@ -130,7 +130,7 @@ class CalendarDayOverrideAdmin(admin.ModelAdmin):  # type: ignore[misc]
         replace_day_override_windows(
             override,
             (
-                (window.start_time, window.end_time)
+                (window.start_time, window.end_time, window.end_offset_days)
                 for window in override.windows.all().order_by(
                     "position",
                     "start_time",
@@ -158,6 +158,7 @@ class CalendarDayOverrideAdmin(admin.ModelAdmin):  # type: ignore[misc]
             return "Closed"
         return ", ".join(
             f"{window.start_time.strftime('%H:%M')}-{window.end_time.strftime('%H:%M')}"
+            + ("+1d" if window.end_offset_days else "")
             for window in windows
         )
 

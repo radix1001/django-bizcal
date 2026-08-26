@@ -34,6 +34,7 @@ from .providers import (
     SetHolidayProvider,
 )
 from .types import coerce_years
+from .windows import ScheduleBlock
 
 
 class CalendarBuilder:
@@ -154,6 +155,7 @@ class CalendarBuilder:
             holiday_provider=holiday_provider,
             day_overrides=cast(DayOverrideInput | None, config.get("day_overrides")),
             name=config.get("name"),
+            holiday_truncates_overnight=bool(config.get("holiday_truncates_overnight", False)),
         )
 
     @classmethod
@@ -268,6 +270,8 @@ class CalendarBuilder:
             config["day_overrides"] = cls._serialize_day_overrides(calendar.day_overrides)
         if calendar.name is not None:
             config["name"] = calendar.name
+        if calendar.holiday_truncates_overnight:
+            config["holiday_truncates_overnight"] = True
         return config
 
     @classmethod
@@ -323,11 +327,7 @@ class CalendarBuilder:
         serialized: WeeklyScheduleConfig = {}
         for weekday, windows in schedule.items():
             serialized[str(weekday)] = [
-                CalendarBuilder._serialize_time_pair(
-                    window.start,
-                    window.end,
-                )
-                for window in windows
+                CalendarBuilder._serialize_schedule_block(block) for block in windows
             ]
         return serialized
 
@@ -340,22 +340,18 @@ class CalendarBuilder:
             serialized[day.isoformat()] = (
                 None
                 if not windows
-                else [
-                    CalendarBuilder._serialize_time_pair(
-                        window.start,
-                        window.end,
-                    )
-                    for window in windows
-                ]
+                else [CalendarBuilder._serialize_schedule_block(block) for block in windows]
             )
         return serialized
 
     @staticmethod
-    def _serialize_time_pair(start: time, end: time) -> TimePairConfig:
-        return (
-            CalendarBuilder._serialize_time_value(start),
-            CalendarBuilder._serialize_time_value(end),
-        )
+    def _serialize_schedule_block(block: ScheduleBlock) -> TimePairConfig:
+        """Serialize a block, keeping the plain 2-tuple shape for intraday blocks."""
+        start = CalendarBuilder._serialize_time_value(block.start)
+        end = CalendarBuilder._serialize_time_value(block.end)
+        if block.end_offset_days == 0:
+            return (start, end)
+        return (start, end, block.end_offset_days)
 
     @staticmethod
     def _serialize_time_value(value: time) -> str:

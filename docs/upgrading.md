@@ -1,5 +1,34 @@
 # Upgrading
 
+## 0.11.0
+
+Additive release for work blocks that cross midnight. No configuration change is required,
+and a calendar without overnight blocks behaves and serializes exactly as in `0.10.1`.
+
+What to check when upgrading:
+
+- Run `python manage.py migrate django_bizcal` if the optional persistence models are
+  enabled. Migration `0003_overnight_blocks` adds `CalendarDayOverrideWindow.end_offset_days`
+  with a default of `0` and replaces the window check constraint with one that also allows
+  `end_time <= start_time` when `end_offset_days = 1`.
+- `WorkingCalendar.weekly_schedule`, `WorkingCalendar.day_overrides`, and
+  `OverrideCalendar.overrides` now expose `ScheduleBlock` values instead of `TimeWindow`
+  values. `ScheduleBlock` keeps the `start` and `end` attributes and adds `end_offset_days`,
+  so attribute access is unchanged; code that does `isinstance(..., TimeWindow)` on these
+  properties, or compares them against `TimeWindow` instances, needs updating.
+  `ScheduleBlock.as_time_window()` converts an intraday block back.
+- The same substitution applies to the persisted-override helpers
+  `get_calendar_day_override_windows(...)` and `list_calendar_day_override_windows(...)`.
+- Inputs are unchanged: a `TimeWindow`, a `(start, end)` pair, or the new
+  `(start, end, end_offset_days)` triple are all accepted wherever a schedule is configured.
+- If you previously modelled an overnight shift by splitting it across two days, replace the
+  pair with a single `(start, end, 1)` block. That removes the one-second gap at midnight
+  that made `business_time_between(...)` under-report the shift by one second.
+- Review call sites of `opening_for_day(...)`, `closing_for_day(...)`,
+  `next_opening_datetime(...)`, and `previous_closing_datetime(...)` if you adopt overnight
+  blocks: they report civil-day boundaries, so they return midnight while a block is open
+  across it. `WorkingCalendar.business_blocks_for_day(...)` returns the whole block.
+
 ## 0.10.1
 
 `0.10.1` finishes the pre-`1.0.0` API-contract cleanup.

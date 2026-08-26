@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django_bizcal import (
@@ -86,3 +86,58 @@ def test_union_calendar_projects_children_across_timezones() -> None:
     assert len(windows) == 2
     assert {window.start.hour for window in windows} == {12, 15}
 
+
+
+def test_union_of_a_day_shift_and_a_night_shift_covers_both_sides_of_midnight() -> None:
+    day_shift = WorkingCalendar(tz="UTC", weekly_schedule={1: [("09:00", "18:00")]})
+    night_shift = WorkingCalendar(tz="UTC", weekly_schedule={0: [("22:00", "06:00", 1)]})
+    union = UnionCalendar([day_shift, night_shift], tz="UTC")
+
+    monday = union.business_windows_for_day(date(2026, 3, 2))
+    tuesday = union.business_windows_for_day(date(2026, 3, 3))
+
+    assert [(window.start.hour, window.end.hour) for window in monday] == [(22, 0)]
+    assert [(window.start.hour, window.end.hour) for window in tuesday] == [(0, 6), (9, 18)]
+    assert union.business_time_between(
+        datetime(2026, 3, 2, 22, 0, tzinfo=ZoneInfo("UTC")),
+        datetime(2026, 3, 3, 18, 0, tzinfo=ZoneInfo("UTC")),
+    ) == timedelta(hours=17)
+
+
+def test_intersection_and_difference_work_across_the_midnight_boundary() -> None:
+    night_shift = WorkingCalendar(tz="UTC", weekly_schedule={0: [("22:00", "06:00", 1)]})
+    early_hours = WorkingCalendar(tz="UTC", weekly_schedule={1: [("00:00", "03:00")]})
+
+    intersection = IntersectionCalendar([night_shift, early_hours], tz="UTC")
+    difference = DifferenceCalendar(night_shift, early_hours, tz="UTC")
+
+    assert [
+        (window.start, window.end)
+        for window in intersection.business_windows_for_day(date(2026, 3, 3))
+    ] == [
+        (
+            datetime(2026, 3, 3, 0, 0, tzinfo=ZoneInfo("UTC")),
+            datetime(2026, 3, 3, 3, 0, tzinfo=ZoneInfo("UTC")),
+        )
+    ]
+    assert intersection.business_windows_for_day(date(2026, 3, 2)) == ()
+    assert [
+        (window.start, window.end)
+        for window in difference.business_windows_for_day(date(2026, 3, 3))
+    ] == [
+        (
+            datetime(2026, 3, 3, 3, 0, tzinfo=ZoneInfo("UTC")),
+            datetime(2026, 3, 3, 6, 0, tzinfo=ZoneInfo("UTC")),
+        )
+    ]
+
+
+def test_override_calendar_materializes_an_overnight_override() -> None:
+    base = WorkingCalendar(tz="UTC", weekly_schedule={0: [("09:00", "18:00")]})
+    calendar = OverrideCalendar(base, overrides={"2026-03-02": [("22:00", "06:00", 1)]})
+
+    monday = calendar.business_windows_for_day(date(2026, 3, 2))
+    tuesday = calendar.business_windows_for_day(date(2026, 3, 3))
+
+    assert [(window.start.hour, window.end.hour) for window in monday] == [(22, 0)]
+    assert [(window.start.hour, window.end.hour) for window in tuesday] == [(0, 6)]

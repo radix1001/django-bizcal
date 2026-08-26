@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import date, datetime
+from datetime import date
 
 from ..exceptions import ValidationError
 from ..intervals import (
@@ -12,11 +12,11 @@ from ..intervals import (
     normalize_intervals,
     subtract_intervals,
 )
-from ..types import DateInput, TimeInput, TzInput, coerce_date
-from ..windows import TimeWindow, build_time_windows
-from .base import BusinessCalendar
+from ..types import DateInput, TzInput, coerce_date
+from ..windows import ScheduleBlock, ScheduleBlockInput, build_schedule_blocks
+from .base import BusinessCalendar, materialize_schedule_blocks
 
-OverrideInput = Mapping[DateInput, Iterable[tuple[TimeInput, TimeInput] | TimeWindow] | None]
+OverrideInput = Mapping[DateInput, Iterable[ScheduleBlockInput] | None]
 
 
 class _CompositeCalendar(BusinessCalendar):
@@ -94,9 +94,14 @@ class DifferenceCalendar(BusinessCalendar):
 
 
 class OverrideCalendar(BusinessCalendar):
-    """Calendar that replaces the base schedule on specific dates."""
+    """Calendar that replaces the base schedule on specific dates.
 
-    __slots__ = ("_base", "_overrides")
+    An override replaces the whole civil day, including the tail of an overnight block
+    started by the base calendar on the previous day. Use `WorkingCalendar`'s own
+    `day_overrides` and `holiday_truncates_overnight` when that tail must survive.
+    """
+
+    __slots__ = ("_base", "_overrides", "_spans_midnight")
 
     def __init__(
         self,
@@ -108,6 +113,9 @@ class OverrideCalendar(BusinessCalendar):
         super().__init__(tz or base.tz)
         self._base = base
         self._overrides = _normalize_overrides(overrides)
+        self._spans_midnight = any(
+            block.spans_midnight for blocks in self._overrides.values() for block in blocks
+        )
 
     @property
     def base(self) -> BusinessCalendar:
@@ -115,26 +123,23 @@ class OverrideCalendar(BusinessCalendar):
         return self._base
 
     @property
-    def overrides(self) -> Mapping[date, tuple[TimeWindow, ...]]:
+    def overrides(self) -> Mapping[date, tuple[ScheduleBlock, ...]]:
         """Explicit day overrides rendered in the override calendar timezone."""
         return self._overrides
 
     def _business_windows_for_day_local(self, day: date) -> tuple[BusinessInterval, ...]:
         if day in self.overrides:
-            return tuple(
-                BusinessInterval(
-                    start=datetime.combine(day, window.start, tzinfo=self.tz),
-                    end=datetime.combine(day, window.end, tzinfo=self.tz),
-                )
-                for window in self.overrides[day]
-            )
+            return materialize_schedule_blocks(day, self.overrides[day], self.tz)
         return self.base.business_windows_for_day(day, tz=self.tz)
+
+    def _may_span_midnight(self) -> bool:
+        return self._spans_midnight
 
 
 def _normalize_overrides(
     overrides: OverrideInput,
-) -> dict[date, tuple[TimeWindow, ...]]:
-    normalized: dict[date, tuple[TimeWindow, ...]] = {}
+) -> dict[date, tuple[ScheduleBlock, ...]]:
+    normalized: dict[date, tuple[ScheduleBlock, ...]] = {}
     for key, values in overrides.items():
-        normalized[coerce_date(key)] = () if values is None else build_time_windows(values)
+        normalized[coerce_date(key)] = () if values is None else build_schedule_blocks(values)
     return normalized

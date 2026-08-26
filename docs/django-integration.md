@@ -555,8 +555,28 @@ set_calendar_day_override(
 )
 ```
 
+A window that crosses midnight is stored as a third element on the spec:
+
+```python
+set_calendar_day_override(
+    "mining",
+    date(2026, 12, 24),
+    [("22:00", "06:00", 1)],
+    name="Christmas Eve night shift",
+)
+```
+
 `CalendarDayOverrideWindow` stores the ordered intraday windows that belong to a given override.
 The uniqueness constraint on `CalendarDayOverride` is `(calendar_name, day)`, and window positions are unique per override.
+Each window also carries `end_offset_days`, which is `0` for an intraday window and `1` when the
+window ends on the following day. A check constraint enforces `end_time > start_time` for
+`end_offset_days = 0` and `end_time <= start_time` for `end_offset_days = 1`, so no persisted
+window can exceed 24 hours.
+
+Persisted overrides are applied through an `OverrideCalendar`, which replaces the whole civil
+day. A persisted holiday therefore truncates an incoming overnight block at midnight, whatever
+the base calendar's `holiday_truncates_overnight` setting is. Use a `WorkingCalendar` day
+override when the tail of the previous night has to survive.
 
 ### Calendar day override helpers
 
@@ -573,6 +593,8 @@ The Django service layer also exposes convenience helpers for persisted intraday
 - `sync_calendar_day_overrides(calendar_name, overrides)`
 
 These helpers normalize windows before saving them and invalidate only the affected named calendar cache entry after each mutation.
+Everywhere they accept windows they also accept `(start, end, end_offset_days)` triples, and the
+read helpers return `ScheduleBlock` values carrying `start`, `end`, and `end_offset_days`.
 The `*_windows(...)` helpers return normalized `TimeWindow` tuples so application code can inspect persisted schedules without traversing ORM relations.
 
 Precedence rules:

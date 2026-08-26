@@ -35,6 +35,7 @@ from django_bizcal import (
     RenderTzInput,
     SameBusinessDayPolicy,
     SameBusinessDayPolicyConfig,
+    ScheduleBlock,
     TimeInput,
     TimeWindow,
     TimezoneError,
@@ -45,6 +46,7 @@ from django_bizcal import (
     WorkingCalendar,
     WorkingCalendarConfig,
     breach_at,
+    build_schedule_blocks,
     business_deadline_at_close,
     deadline_for,
     due_on_next_business_day,
@@ -87,6 +89,7 @@ EXPECTED_ROOT_PUBLIC_API = {
     "RenderTzInput",
     "SameBusinessDayPolicy",
     "SameBusinessDayPolicyConfig",
+    "ScheduleBlock",
     "TimeInput",
     "TimeWindow",
     "TimezoneError",
@@ -97,6 +100,7 @@ EXPECTED_ROOT_PUBLIC_API = {
     "WorkingCalendar",
     "WorkingCalendarConfig",
     "breach_at",
+    "build_schedule_blocks",
     "business_deadline_at_close",
     "deadline_for",
     "due_on_next_business_day",
@@ -138,6 +142,7 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert OverrideCalendarConfig is not None
     assert RenderTzInput is not None
     assert SameBusinessDayPolicy is not None
+    assert ScheduleBlock is not None
     assert SameBusinessDayPolicyConfig is not None
     assert TimeInput is not None
     assert TimeWindow is not None
@@ -149,6 +154,7 @@ def test_root_package_exports_public_api_symbols() -> None:
     assert WorkingCalendar is not None
     assert WorkingCalendarConfig is not None
     assert breach_at is not None
+    assert build_schedule_blocks is not None
     assert business_deadline_at_close is not None
     assert deadline_for is not None
     assert due_on_next_business_day is not None

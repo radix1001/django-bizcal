@@ -18,6 +18,34 @@ Key behavior:
 - Merges adjacent or overlapping windows through normalization helpers
 - Supports `intersection(...)` and `subtract(...)`
 
+### `ScheduleBlock`
+
+Represents a local-time work block that may end on a following day, so an overnight
+shift can be expressed as a single block.
+
+```python
+from django_bizcal import ScheduleBlock, build_schedule_blocks
+
+night = ScheduleBlock.from_pair("22:00", "06:00", 1)
+blocks = build_schedule_blocks([("09:00", "18:00"), ("22:00", "06:00", 1)])
+```
+
+Key behavior:
+
+- `end_offset_days` is `0` for an intraday block and `1` for a block that crosses midnight
+- With `end_offset_days=0` it validates `start < end`, exactly like `TimeWindow`
+- With `end_offset_days=1` it validates `end <= start`, which bounds a block to 24 hours
+- Any other offset is rejected: a block may never span more than one midnight
+- `build_schedule_blocks(...)` orders and merges blocks; blocks that cannot merge into a
+  single 24-hour block are left alone and merged later as timezone-aware intervals
+- Blocks are materialization specifications only: they deliberately have no
+  `overlaps` / `merge` / `intersection` / `subtract`, because cross-midnight arithmetic
+  belongs to `BusinessInterval`
+
+Schedule specs accept a `TimeWindow`, a `ScheduleBlock`, a `(start, end)` pair, or a
+`(start, end, end_offset_days)` triple, everywhere a weekly schedule or a day override
+is configured.
+
 ### `BusinessInterval`
 
 Represents a timezone-aware half-open datetime interval.
@@ -68,6 +96,29 @@ calendar = WorkingCalendar(
 
 Use `WorkingCalendar.from_country(...)` to combine weekly schedules with official holidays from `holidays`.
 
+Overnight shifts are configured with a third element on the schedule spec:
+
+```python
+night_shift = WorkingCalendar(
+    tz="America/Santiago",
+    weekly_schedule={weekday: [("22:00", "06:00", 1)] for weekday in range(5)},
+)
+```
+
+`WorkingCalendar` adds two members for overnight work:
+
+- `business_blocks_for_day(day)` returns whole blocks anchored to the day on which they
+  start, without clipping them at midnight, so the Monday query reports the shift ending
+  at `06:00` on Tuesday. Only `WorkingCalendar` exposes it: a composite calendar receives
+  coverage from its children already clipped to civil days and could not reconstruct the
+  identity of the original block.
+- `holiday_truncates_overnight` (default `False`) decides what a closed day does to the
+  previous night's block. With the default, a holiday or a closing day override suppresses
+  only the blocks that *start* that day, and the incoming tail survives. Set it to `True`
+  to suppress every bit of coverage on a closed day, truncating the incoming block at
+  midnight. A weekday that simply has no scheduled block is not "closed" in this sense and
+  always receives the tail.
+
 ### `UnionCalendar`
 
 Combines multiple calendars and stays open whenever any child is open.
@@ -83,6 +134,12 @@ Removes one calendar's intervals from a base calendar.
 ### `OverrideCalendar`
 
 Substitutes the full schedule of specific dates while delegating the rest to a base calendar.
+
+An override replaces the whole civil day, including the tail of an overnight block the base
+calendar started the previous day. Because `apply_database_overrides(...)` builds an
+`OverrideCalendar`, a persisted holiday truncates an incoming overnight block at midnight
+regardless of the base calendar's `holiday_truncates_overnight` setting. Use a
+`WorkingCalendar` day override when that tail has to survive.
 
 ## Operations
 
@@ -112,9 +169,16 @@ All calendar implementations expose:
 Notes:
 
 - Datetime operations require aware datetimes.
-- `business_windows_for_day(...)` returns `BusinessInterval` values.
+- `business_windows_for_day(...)` returns `BusinessInterval` values clipped to the civil day.
+  Adjacent days tile the timeline exactly, so an overnight shift is reported as
+  `[22:00, 24:00)` on its starting day and `[00:00, 06:00)` on the next one, with no gap.
+- `business_windows_for_range(...)` is not clipped per day: it merges an overnight block
+  into a single interval.
+- `is_business_day(...)` is `True` for a day covered only by the tail of an overnight block.
 - `next_business_day(...)` and `previous_business_day(...)` are inclusive of the input day.
-- `next_opening_datetime(...)` and `previous_closing_datetime(...)` return real schedule boundaries, even when the input lies outside business time.
+- `next_opening_datetime(...)` and `previous_closing_datetime(...)` return real schedule boundaries, even when the input lies outside business time. Their boundaries are civil-day boundaries: while an overnight block is open across midnight, they report midnight rather than the block's own start or end.
+- Deadlines resolved `at="closing"` do follow an overnight block past midnight on a
+  `WorkingCalendar`; on a composite calendar the closing of an overnight block is midnight.
 - `previous_business_datetime(...)` may return the closing boundary of the last open interval when the input is outside business time.
 
 ## Deadlines
@@ -304,6 +368,12 @@ Working calendar keys:
 - `day_overrides`
 - `observed`
 - `name`
+- `holiday_truncates_overnight`
+
+Schedule entries in `weekly_schedule` and `day_overrides` are `[start, end]` pairs, or
+`[start, end, end_offset_days]` triples for a block that ends on the following day.
+`to_dict(...)` emits the triple form only for blocks that actually cross midnight, so a
+calendar without overnight blocks serializes exactly as it did before the feature existed.
 
 Composition keys:
 

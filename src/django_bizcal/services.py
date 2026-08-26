@@ -25,8 +25,8 @@ from .resolvers import (
     normalize_deadline_policy_resolution,
 )
 from .settings import get_bizcal_settings, reset_bizcal_settings_cache
-from .types import DateInput, TimeInput, coerce_date, ensure_aware
-from .windows import TimeWindow, build_time_windows
+from .types import DateInput, coerce_date, ensure_aware
+from .windows import ScheduleBlock, ScheduleBlockInput, build_schedule_blocks
 
 if TYPE_CHECKING:
     from .models import CalendarDayOverride as CalendarDayOverrideRow
@@ -334,7 +334,7 @@ def list_calendar_day_override_windows(
     *,
     include_inactive: bool = False,
     using: str = "default",
-) -> dict[date, tuple[TimeWindow, ...]]:
+) -> dict[date, tuple[ScheduleBlock, ...]]:
     """Return normalized persisted override windows keyed by day."""
     return {
         override.day: _override_windows(override)
@@ -405,7 +405,7 @@ def get_calendar_day_override_windows(
     *,
     include_inactive: bool = False,
     using: str = "default",
-) -> tuple[TimeWindow, ...] | None:
+) -> tuple[ScheduleBlock, ...] | None:
     """Return normalized persisted override windows for one logical day."""
     override = get_calendar_day_override(
         calendar_name,
@@ -446,7 +446,7 @@ def set_calendar_holiday(
 def set_calendar_day_override(
     calendar_name: str,
     day: DateInput,
-    windows: Iterable[tuple[TimeInput, TimeInput] | TimeWindow],
+    windows: Iterable[ScheduleBlockInput],
     *,
     name: str = "",
     is_active: bool = True,
@@ -507,7 +507,7 @@ def activate_calendar_day_override(
     calendar_name: str,
     day: DateInput,
     *,
-    windows: Iterable[tuple[TimeInput, TimeInput] | TimeWindow] | None = None,
+    windows: Iterable[ScheduleBlockInput] | None = None,
     name: str | None = None,
     using: str = "default",
 ) -> CalendarDayOverrideRow:
@@ -524,11 +524,11 @@ def activate_calendar_day_override(
             "activate_calendar_day_override requires windows when the override does not exist."
         )
     if windows is not None:
-        resolved_windows: Iterable[tuple[TimeInput, TimeInput] | TimeWindow] = windows
+        resolved_windows: Iterable[ScheduleBlockInput] = windows
     else:
         assert existing is not None
         resolved_windows = [
-            (window.start_time, window.end_time)
+            (window.start_time, window.end_time, window.end_offset_days)
             for window in existing.windows.all().order_by("position", "start_time")
         ]
     resolved_name = existing.name if existing is not None and name is None else (name or "")
@@ -653,7 +653,7 @@ def sync_calendar_holidays(
 
 def sync_calendar_day_overrides(
     calendar_name: str,
-    overrides: dict[DateInput, Iterable[tuple[TimeInput, TimeInput] | TimeWindow]],
+    overrides: dict[DateInput, Iterable[ScheduleBlockInput]],
     *,
     using: str = "default",
 ) -> tuple[CalendarDayOverrideRow, ...]:
@@ -662,8 +662,7 @@ def sync_calendar_day_overrides(
 
     normalized_name = _normalize_calendar_name(calendar_name)
     normalized_overrides = {
-        coerce_date(day): build_time_windows(windows)
-        for day, windows in overrides.items()
+        coerce_date(day): build_schedule_blocks(windows) for day, windows in overrides.items()
     }
     existing_by_day = {
         override.day: override
@@ -791,7 +790,8 @@ def _bind_calendar_name(
     return calendar
 
 
-def _override_windows(override: CalendarDayOverrideRow) -> tuple[TimeWindow, ...]:
-    return build_time_windows(
-        (window.start_time, window.end_time) for window in override.windows.all()
+def _override_windows(override: CalendarDayOverrideRow) -> tuple[ScheduleBlock, ...]:
+    return build_schedule_blocks(
+        (window.start_time, window.end_time, window.end_offset_days)
+        for window in override.windows.all()
     )

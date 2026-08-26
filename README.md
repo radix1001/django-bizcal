@@ -15,6 +15,7 @@ It is designed for SLA clocks, operational workflows, due dates, approvals, supp
 - Official holidays via [`holidays`](https://pypi.org/project/holidays/).
 - Custom organization or tenant holidays in memory.
 - Intraday schedules with multiple windows per weekday.
+- Work blocks that cross midnight, so an overnight shift is a single block.
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
 - SLA and due-date helpers built on top of business calendars.
@@ -78,6 +79,47 @@ start = datetime(2026, 1, 5, 15, 0, tzinfo=ZoneInfo("UTC"))
 deadline = regional.add_business_hours(start, 10)
 elapsed = regional.business_minutes_between(start, deadline)
 ```
+
+## Overnight work blocks
+
+A block that starts one day and ends the next is a single schedule entry, written as
+`(start, end, end_offset_days)`:
+
+```python
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from django_bizcal import WorkingCalendar
+
+mine = WorkingCalendar(
+    tz="America/Santiago",
+    weekly_schedule={weekday: [("22:00", "06:00", 1)] for weekday in range(5)},
+)
+
+santiago = ZoneInfo("America/Santiago")
+shift_start = datetime(2026, 3, 2, 22, 0, tzinfo=santiago)
+shift_end = datetime(2026, 3, 3, 6, 0, tzinfo=santiago)
+
+assert mine.business_time_between(shift_start, shift_end) == timedelta(hours=8)
+assert mine.add_business_hours(shift_start, 5) == datetime(2026, 3, 3, 3, 0, tzinfo=santiago)
+assert mine.is_business_day("2026-03-03") is True
+```
+
+Day queries report coverage clipped to the civil day, so the two halves of the night tile
+the timeline exactly:
+
+```python
+# Monday: [22:00 -> Tuesday 00:00)
+mine.business_windows_for_day("2026-03-02")
+# Tuesday: [00:00 -> 06:00), then Tuesday's own shift [22:00 -> Wednesday 00:00)
+mine.business_windows_for_day("2026-03-03")
+# Monday, unclipped: [22:00 -> Tuesday 06:00), the whole block
+mine.business_blocks_for_day("2026-03-02")
+```
+
+By default a holiday suppresses only the blocks that *start* on it, so a shift already
+running into a holiday morning is preserved. Pass `holiday_truncates_overnight=True` to
+truncate the incoming block at midnight instead.
 
 ## Deadline helpers
 
@@ -551,6 +593,14 @@ See the full documentation in:
 - Official holiday lookup requires the relevant years to be preloaded.
 - Wall-clock times are interpreted with `zoneinfo`; DST transitions affect real elapsed durations.
 - The library persists named calendar closures and per-day overrides, but not full calendar definitions or arbitrary composition graphs.
+- A work block may cross at most one midnight, so a single block cannot exceed 24 hours.
+- `business_windows_for_day(...)` reports coverage clipped to the civil day. While an overnight
+  block is open across midnight, `opening_for_day(...)`, `closing_for_day(...)`,
+  `next_opening_datetime(...)`, and `previous_closing_datetime(...)` report midnight rather
+  than the block's own boundaries. Use `WorkingCalendar.business_blocks_for_day(...)` for the
+  whole unclipped block.
+- `WorkingCalendar.business_blocks_for_day(...)` is not available on composite calendars,
+  whose children already report coverage clipped to civil days.
 
 ## Release
 

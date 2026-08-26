@@ -91,6 +91,10 @@ class CalendarDayOverrideWindow(models.Model):  # type: ignore[misc]
     )
     start_time = models.TimeField()
     end_time = models.TimeField()
+    end_offset_days = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="0 for an intraday window, 1 when the window ends on the next day.",
+    )
     position = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -100,7 +104,11 @@ class CalendarDayOverrideWindow(models.Model):  # type: ignore[misc]
         constraints = [
             models.CheckConstraint(
                 **{
-                    _CHECK_CONSTRAINT_ARG: Q(end_time__gt=F("start_time")),
+                    _CHECK_CONSTRAINT_ARG: Q(
+                        end_offset_days=0,
+                        end_time__gt=F("start_time"),
+                    )
+                    | Q(end_offset_days=1, end_time__lte=F("start_time")),
                     "name": "bizcal_day_override_window_start_before_end",
                 }
             ),
@@ -111,7 +119,8 @@ class CalendarDayOverrideWindow(models.Model):  # type: ignore[misc]
         ]
 
     def __str__(self) -> str:
+        suffix = f" (+{self.end_offset_days}d)" if self.end_offset_days else ""
         return (
             f"{self.override.calendar_name} @ {self.override.day.isoformat()} "
-            f"{self.start_time.isoformat()}-{self.end_time.isoformat()}"
+            f"{self.start_time.isoformat()}-{self.end_time.isoformat()}{suffix}"
         )
