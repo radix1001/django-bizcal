@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo
 
-from ..exceptions import CalendarRangeError
+from ..exceptions import CalendarRangeError, ValidationError
 from ..intervals import BusinessInterval, normalize_intervals
 from ..types import (
     DateInput,
@@ -329,6 +329,40 @@ class BusinessCalendar(ABC):
         """Add business minutes as real elapsed time."""
         return self.add_business_time(start, timedelta(minutes=minutes))
 
+    def add_business_days(self, start: datetime, days: int) -> datetime:
+        """Move a timezone-aware datetime by whole business days.
+
+        The result keeps the start's wall-clock time in the calendar timezone, so one
+        business day after Wednesday 16:30 is Thursday 16:30. A start outside business
+        time is first moved to the next business datetime, or to the previous one when
+        ``days`` is negative, matching ``add_business_time(...)``. When the target day has
+        no business time at that wall-clock time, the result snaps into that day: forward
+        to the next opening, or back to the day's closing once the time is past it.
+        """
+        if isinstance(days, bool) or not isinstance(days, int):
+            raise ValidationError("days must be an integer.")
+        cursor = ensure_aware(start, param_name="start")
+        local = cursor.astimezone(self.tz)
+        anchor = (
+            self.previous_business_datetime(local)
+            if days < 0
+            else self.next_business_datetime(local)
+        )
+        if days == 0:
+            return anchor.astimezone(cursor.tzinfo)
+        day = anchor.date()
+        for _ in range(abs(days)):
+            day = (
+                self.next_business_day(day + timedelta(days=1))
+                if days > 0
+                else self.previous_business_day(day - timedelta(days=1))
+            )
+        # Normalizing through UTC keeps the wall clock valid inside a DST forward gap.
+        wall_clock = datetime.combine(day, anchor.time(), tzinfo=self.tz)
+        candidate = wall_clock.astimezone(UTC).astimezone(self.tz)
+        resolved = _snap_into_day(candidate, self.business_windows_for_day(day))
+        return resolved.astimezone(cursor.tzinfo)
+
     def deadline_for(
         self,
         start: datetime,
@@ -573,6 +607,19 @@ def _local_day_start(day: date, tzinfo: tzinfo) -> datetime:
 def _local_day_end(day: date, tzinfo: tzinfo) -> datetime:
     """Return the exclusive end instant of the given local calendar day."""
     return _local_day_start(day + timedelta(days=1), tzinfo)
+
+
+def _snap_into_day(
+    candidate: datetime,
+    intervals: tuple[BusinessInterval, ...],
+) -> datetime:
+    """Move a datetime into a day's business intervals, never past the day's closing."""
+    for interval in intervals:
+        if candidate <= interval.start:
+            return interval.start
+        if interval.start <= candidate <= interval.end:
+            return candidate
+    return intervals[-1].end
 
 
 def _iter_days(start: date, end: date) -> tuple[date, ...]:

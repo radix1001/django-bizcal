@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+- Added `BusinessCalendar.add_business_days(start, days)` on every calendar implementation. It moves a timezone-aware datetime by whole business days while keeping its wall-clock time in the calendar timezone, skips weekends, holidays and closed days, and supports negative values to move backwards.
+- A start outside business time is anchored like `add_business_time(...)`: to the next business datetime, or to the previous one when `days` is negative. `days=0` returns that anchor.
+- When the target day does not cover the wall-clock time, the result snaps into that day, forward to the next opening or back to the closing, matching the snapping `BusinessDaysPolicy` already applies to a fixed `at` time. A wall clock that falls inside a DST forward gap is normalized to a valid local time.
+- The result is returned in the timezone of `start`, naive datetimes raise `ValidationError`, and so does a `days` value that is not an `int`.
+- Backward compatibility: this release is purely additive.
+
 ## 0.11.0
 
 - Added `ScheduleBlock` and `build_schedule_blocks(...)` so a work block can start on one day and end on the next, making overnight shifts such as `22:00 -> 06:00` expressible as a single block instead of two windows separated by a one-second gap at midnight.

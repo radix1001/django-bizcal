@@ -161,6 +161,7 @@ All calendar implementations expose:
 - `add_business_time(dt, delta)`
 - `add_business_hours(dt, hours)`
 - `add_business_minutes(dt, minutes)`
+- `add_business_days(dt, days)`
 - `business_time_between(start, end)`
 - `business_minutes_between(start, end)`
 - `business_hours_between(start, end)`
@@ -180,6 +181,14 @@ Notes:
 - Deadlines resolved `at="closing"` do follow an overnight block past midnight on a
   `WorkingCalendar`; on a composite calendar the closing of an overnight block is midnight.
 - `previous_business_datetime(...)` may return the closing boundary of the last open interval when the input is outside business time.
+- `add_business_days(...)` keeps the start's wall-clock time in the calendar timezone and
+  returns the result in the start's timezone. A start outside business time is first moved
+  with `next_business_datetime(...)`, or `previous_business_datetime(...)` when `days` is
+  negative, and `days=0` matches `add_business_time(dt, timedelta(0))`. When the target day
+  does not cover that wall-clock time, the result moves forward to the day's next opening,
+  or back to its closing once the time is past it, the same snapping that `BusinessDaysPolicy`
+  applies to a fixed `at` time. It counts calendar days that `is_business_day(...)` reports,
+  so a day covered only by the tail of an overnight block counts as a business day.
 
 ## Deadlines
 
