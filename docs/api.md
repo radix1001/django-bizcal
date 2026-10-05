@@ -181,14 +181,39 @@ Notes:
 - Deadlines resolved `at="closing"` do follow an overnight block past midnight on a
   `WorkingCalendar`; on a composite calendar the closing of an overnight block is midnight.
 - `previous_business_datetime(...)` may return the closing boundary of the last open interval when the input is outside business time.
-- `add_business_days(...)` keeps the start's wall-clock time in the calendar timezone and
-  returns the result in the start's timezone. A start outside business time is first moved
-  with `next_business_datetime(...)`, or `previous_business_datetime(...)` when `days` is
-  negative, and `days=0` matches `add_business_time(dt, timedelta(0))`. When the target day
-  does not cover that wall-clock time, the result moves forward to the day's next opening,
-  or back to its closing once the time is past it, the same snapping that `BusinessDaysPolicy`
-  applies to a fixed `at` time. It counts calendar days that `is_business_day(...)` reports,
-  so a day covered only by the tail of an overnight block counts as a business day.
+- `add_business_time(...)`, `add_business_hours(...)`, and `add_business_minutes(...)` count
+  real elapsed business time and accept negative values.
+
+### `add_business_days(dt, days)`
+
+Moves an aware datetime by whole business days and keeps its wall-clock time.
+
+```python
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+santiago = ZoneInfo("America/Santiago")
+start = datetime(2026, 3, 4, 16, 30, tzinfo=santiago)  # Wednesday
+
+calendar.add_business_days(start, 1)   # Thursday 16:30
+calendar.add_business_days(start, -1)  # Tuesday 16:30
+```
+
+Semantics:
+
+- `days` must be an `int`. Positive values move forward, negative values move backward.
+- The wall-clock time is taken in the calendar timezone. The result is returned in the
+  timezone of `dt`.
+- A start outside business time is first moved with `next_business_datetime(...)`, or with
+  `previous_business_datetime(...)` when `days` is negative. `days=0` returns that anchor,
+  the same value as `add_business_time(dt, timedelta(0))`.
+- When the target day does not cover the wall-clock time, the result moves to the day's next
+  opening, or back to its closing when the time is past it. `BusinessDaysPolicy` applies the
+  same rule to a fixed `at` time.
+- A wall-clock time inside a DST forward gap is normalized to a valid local time.
+- Days are counted with `is_business_day(...)`, so a day covered only by the tail of an
+  overnight block counts as a business day.
+- A naive `dt` raises `ValidationError`, and so does a `days` value that is not an `int`.
 
 ## Deadlines
 
@@ -239,7 +264,7 @@ When a calendar comes from Django service resolution, `calendar.calendar_name` i
 
 ## Deadline policies
 
-The policy layer provides reusable, declarative deadline rules on top of the calendar engine.
+Deadline policies are declarative deadline rules evaluated against a calendar.
 
 Built-in policy types:
 
@@ -288,8 +313,8 @@ Parameters:
 
 ### `BusinessDaysAtClosePolicy`
 
-Compatibility convenience policy that resolves after a number of business-day
-closing boundaries.
+Resolves after a number of business-day closing boundaries. Equivalent to
+`BusinessDaysPolicy(..., at="closing")` and kept for compatibility.
 
 Parameters:
 

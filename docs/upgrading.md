@@ -1,5 +1,9 @@
 # Upgrading
 
+## 0.12.1
+
+Documentation release. No code, configuration, or migration change is required.
+
 ## 0.12.0
 
 Additive release. No configuration, migration, or code change is required.
@@ -61,7 +65,7 @@ Upgrade guidance:
 
 ## 0.10.0
 
-`0.10.0` was the broad compatibility and release-hardening step that set up the final pre-`1.0.0` polish releases.
+`0.10.0` widened the supported Django range and reworked CI.
 
 Compatibility changes:
 
@@ -72,7 +76,7 @@ Compatibility changes:
 Project guidance:
 
 - see `docs/stability.md` for the stable import surfaces and the tested support matrix
-- CI now validates `ruff`, `mypy`, `build`, and `twine check` outside the test matrix, so release readiness is checked continuously
+- CI now runs `ruff`, `mypy`, `build`, and `twine check` in a separate job before the test matrix
 - use `examples/performance_benchmark.py` when you want a quick local signal for hot-path performance after changes
 
 ## 0.7.0
@@ -108,7 +112,7 @@ Upgrade guidance:
 
 ## 0.9.0
 
-`0.9.0` focuses on stabilization rather than new product surface.
+`0.9.0` adds caching and export tests. It adds no new public API.
 
 Behavioral changes:
 
@@ -119,7 +123,7 @@ Behavioral changes:
 
 Upgrade guidance:
 
-- reusing calendar instances is now even more valuable in hot paths because repeated day queries benefit from per-instance memoization
+- reuse calendar instances in hot paths: repeated day queries are served from the per-instance cache
 - if your tests mutate Django settings dynamically, keep calling `reset_calendar_cache()` before rebuilding calendars or policies
 - if your tests only mutate deadline-policy settings, `reset_deadline_policy_cache()` is sufficient
 - no import-path changes are required

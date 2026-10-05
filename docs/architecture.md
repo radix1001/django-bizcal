@@ -5,14 +5,14 @@
 - Distribution name: `django-bizcal`
 - Import name: `django_bizcal`
 
-The distribution name is explicit for PyPI and keeps strong discoverability in Django ecosystems. The import name follows normal Python packaging conventions.
+The distribution name follows the `django-` prefix convention for Django packages on PyPI. The import name follows normal Python packaging conventions.
 
 ## Architectural goals
 
 - Keep the business-time engine reusable outside Django.
-- Make Django integration ergonomic instead of invasive.
+- Keep the Django integration optional and separate from the domain core.
 - Keep the v1 public API compact, explicit, and semver-friendly.
-- Support real calendar composition instead of only simple business-day checks.
+- Support calendar composition, not only business-day checks.
 - Prefer serializable configuration so projects can define calendars declaratively.
 
 ## Layering
@@ -37,7 +37,7 @@ Responsibilities:
 - Normalize, merge, intersect, and subtract time windows.
 - Represent working calendars and composed calendars.
 - Compute business-time arithmetic and elapsed business time.
-- Provide small application-oriented helpers for SLA clocks and due-date calculation without coupling the core to Django.
+- Provide helpers for SLA clocks and due-date calculation without coupling the core to Django.
 - Provide a declarative policy layer for reusable cutoff and due-date rules without pushing workflow logic into Django settings or ORM models.
 
 ### Holiday providers
@@ -99,7 +99,7 @@ The practical effect is:
 
 ## Why persistence stays minimal
 
-The hardest part of this product is correct business-time behavior across holidays, schedules, composition, and timezones. Full calendar-definition persistence would force an early schema and serialization contract before the core API settles.
+Most of the complexity is in business-time behavior across holidays, schedules, composition, and timezones. Persisting full calendar definitions would fix a schema and serialization contract before the core API is stable.
 
 The chosen strategy is:
 
@@ -111,7 +111,7 @@ The chosen strategy is:
 - Keep contextual calendar selection in application code through `BIZCAL_CALENDAR_RESOLVER` instead of persisting full calendar graphs prematurely
 - Keep weekly schedules and composition declarative rather than ORM-managed for now.
 
-This keeps the library lighter, easier to test, and easier to embed into other Django codebases while still unlocking tenant- or client-specific closed dates and one-off special schedules.
+This keeps the persisted schema small while still supporting tenant- or client-specific closed dates and one-off schedules.
 
 ## Timezone strategy
 
@@ -150,10 +150,10 @@ as a wrap-around `TimeWindow`. The reasoning:
   `intersection`, `subtract`, and the normalize/intersect/subtract helpers) that assumes a
   linear order within one day. Adding wrap-around would mean rewriting all of it and every
   call site.
-- `BusinessInterval` already handles arbitrary timezone-aware intervals, and computes
-  durations in UTC, so DST correctness across a midnight boundary comes for free.
+- `BusinessInterval` already handles arbitrary timezone-aware intervals and computes
+  durations in UTC, so DST is handled across a midnight boundary without extra code.
 
-So the rule is: cross-midnight lives in `BusinessInterval`, never in `TimeWindow`.
+The rule is: cross-midnight lives in `BusinessInterval`, never in `TimeWindow`.
 `ScheduleBlock` is only a materialization spec, converted to intervals in one place and
 taking no part in the algebra.
 
@@ -170,8 +170,8 @@ The cost is that the identity of a block is only visible on the calendar that ow
 `WorkingCalendar.business_blocks_for_day(...)`. Composites deliberately do not expose it.
 
 Civil-day boundaries are computed as instants and normalized through UTC, so a boundary
-never carries a local wall clock that does not exist — the midnight skipped by a DST
-forward transition, for instance.
+never carries a local wall clock that does not exist, such as the midnight skipped by a DST
+forward transition.
 
 ## Composition semantics
 

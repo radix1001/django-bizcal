@@ -5,26 +5,26 @@
 [![CI](https://github.com/radix1001/django-bizcal/actions/workflows/ci.yml/badge.svg)](https://github.com/radix1001/django-bizcal/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/radix1001/django-bizcal/blob/main/LICENSE)
 
-`django-bizcal` is a production-oriented Python library for Django projects that need composable business calendars with official holidays, custom holidays, intraday schedules, timezone-aware arithmetic, and reusable service integration.
+`django-bizcal` is a Python library for Django projects that need business calendars: official and custom holidays, intraday schedules, calendar composition, and timezone-aware business-time arithmetic.
 
-It is designed for SLA clocks, operational workflows, due dates, approvals, support desks, tenant-specific calendars, and country-specific business hours.
+Typical uses are SLA clocks, due dates, approvals, support desks, tenant-specific calendars, and country-specific business hours.
 
-## Highlights
+## Features
 
 - Pure domain core with no ORM coupling.
 - Official holidays via [`holidays`](https://pypi.org/project/holidays/).
 - Custom organization or tenant holidays in memory.
 - Intraday schedules with multiple windows per weekday.
+- Business-time arithmetic in hours, minutes, and whole business days.
 - Work blocks that cross midnight, so an overnight shift is a single block.
 - Calendar composition with union, intersection, difference, and override.
 - Explicit timezone support based on `zoneinfo`.
 - SLA and due-date helpers built on top of business calendars.
 - Declarative deadline policies for common operational rules and cutoffs.
-- Reusable Django app with namespaced settings and service helpers.
+- Django app with namespaced settings and service helpers.
 - Optional database-backed holiday closures and per-day schedule overrides for named Django calendars.
 - Context-aware Django calendar resolution for tenant, client, or region specific lookups.
 - Context-aware Django deadline-policy resolution for tenant, priority, or workflow specific SLA rules.
-- Modern packaging with `pyproject.toml`, wheel/sdist builds, pytest, and GitHub Actions.
 
 ## Installation
 
@@ -95,9 +95,30 @@ assert cl.add_business_days(wednesday, 3) == datetime(2026, 10, 13, 16, 30, tzin
 assert cl.add_business_days(wednesday, -1) == datetime(2026, 10, 6, 16, 30, tzinfo=santiago)
 ```
 
-A start outside business time is first moved to the next business datetime (the previous
-one for negative values), and a wall-clock time the target day does not cover snaps into
-that day, up to its closing.
+Rules:
+
+- A start outside business time is first moved to the next business datetime, or to the
+  previous one when `days` is negative. Wednesday 20:00 plus one business day is Friday 09:00.
+- If the target day does not cover the wall-clock time, the result moves into that day: to
+  the next opening, or back to the closing when the time is past it. Thursday 17:30 plus one
+  business day is Friday 17:00 when Friday closes at 17:00.
+- The result is returned in the timezone of the start.
+
+The calendar always has a timezone. The datetime passed as the start must also carry one:
+a naive datetime raises `ValidationError`, because the library cannot tell which local time
+it refers to. With Django's `USE_TZ = True`, `timezone.now()` and model `DateTimeField` values
+are already aware. Otherwise, attach the calendar timezone first:
+
+```python
+from django.utils import timezone
+
+start = timezone.make_aware(naive_start, calendar.tz)
+calendar.add_business_days(start, 1)
+```
+
+To land on a fixed boundary instead of the start's wall-clock time, use
+`business_deadline_at_close(...)` or `BusinessDaysPolicy(..., at="opening")`.
+`examples/business_days.py` combines hours, days, and both.
 
 ## Overnight work blocks
 
@@ -217,7 +238,7 @@ deadline = cl.resolve_deadline_policy_dict(
 
 ## Django integration
 
-Add the reusable app:
+Add the app to `INSTALLED_APPS`:
 
 ```python
 INSTALLED_APPS = [
@@ -414,7 +435,7 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
 ```
 
-Or, more ergonomically:
+Or with the calendar method:
 
 ```python
 calendar = get_calendar_for(tenant="acme", region="cl")
@@ -456,8 +477,9 @@ contextual_deadline = compute_deadline(
 
 Calendars resolved through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)` also carry their logical `calendar_name`, so `BusinessDeadline.calendar_name` is filled automatically in the common Django flows.
 
-For more complete scenarios, see:
+More examples:
 
+- `examples/business_days.py`
 - `examples/sla_deadlines.py`
 - `examples/helpdesk_sla.py`
 - `examples/deadline_policies.py`
@@ -565,10 +587,11 @@ config = CalendarBuilder.to_dict(calendar)
 restored = CalendarBuilder.from_dict(config)
 ```
 
-## API ergonomics
+## Day and boundary helpers
 
-Common day- and boundary-level helpers are part of the public API:
+The public API also includes day- and boundary-level helpers:
 
+- `add_business_hours(...)`, `add_business_minutes(...)`, `add_business_days(...)`
 - `iter_business_days(...)`, `list_business_days(...)`, `count_business_days(...)`
 - `next_business_day(...)`, `previous_business_day(...)`
 - `opening_for_day(...)`, `closing_for_day(...)`
@@ -589,7 +612,6 @@ Typed declarative config helpers are also exported for IDE and static typing sup
 - `WorkingCalendar` handles business schedules and holiday lookup.
 - Composition calendars project child windows into a reference timezone.
 - The Django layer wraps settings, AppConfig, service helpers, and optional persistence for named calendar closures and per-day overrides.
-- The public core remains framework-light even though Django-specific models are now available behind the reusable app boundary.
 
 See the full documentation in:
 
@@ -628,8 +650,8 @@ python -m build
 pytest
 ```
 
-The recommended release path uses GitHub Actions plus PyPI Trusted Publishing. Publishing guidance is documented in [`docs/release.md`](docs/release.md).
+Releases are published from GitHub Actions with PyPI Trusted Publishing. See [`docs/release.md`](docs/release.md).
 
 ## Support
 
-If `django-bizcal` helps your team, consider sponsoring ongoing maintenance, documentation, and new features through GitHub Sponsors or by reaching out for support and implementation work.
+Report bugs and request features through [GitHub issues](https://github.com/radix1001/django-bizcal/issues).

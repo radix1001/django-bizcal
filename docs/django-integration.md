@@ -1,6 +1,6 @@
 # Django integration
 
-## Reusable app
+## Installation
 
 Install the package and add it to `INSTALLED_APPS`:
 
@@ -11,8 +11,8 @@ INSTALLED_APPS = [
 ]
 ```
 
-The app remains lightweight.
-Its persistence layer is intentionally small: optional models for full-day closures and per-day intraday overrides, not full calendar-definition storage.
+The persistence layer is optional and limited to full-day closures and per-day intraday
+overrides. Full calendar definitions are not stored in the database.
 
 Resolved Django settings are also cached process-locally for reuse. In tests or
 reload scenarios that mutate settings dynamically, call `reset_calendar_cache()`
@@ -218,7 +218,7 @@ BIZCAL_DEADLINE_POLICIES = {
 }
 ```
 
-This enables a lightweight policy layer for recurring operational rules without forcing each Django app to hand-roll deadline logic.
+Named policies let different parts of a project share the same deadline rules.
 
 ### `BIZCAL_DEADLINE_POLICY_RESOLVER`
 
@@ -392,9 +392,38 @@ Rules:
 - named deadline policies are cached similarly to named calendars
 - passing `policy_name=None` uses `BIZCAL_DEADLINE_POLICY_RESOLVER` with the same contextual inputs used for calendar resolution
 
+### Business-time arithmetic
+
+Calendars returned by the services expose the same arithmetic as any `BusinessCalendar`:
+
+```python
+from django_bizcal.django_api import get_calendar_for
+
+calendar = get_calendar_for(tenant=ticket.tenant, region=ticket.region)
+
+first_response_due = calendar.add_business_hours(ticket.created_at, 4)
+resolution_due = calendar.add_business_days(ticket.created_at, 3)
+```
+
+`add_business_days(...)` keeps the wall-clock time of the start, so a ticket created on
+Wednesday at 16:30 with three business days is due on Monday at 16:30, or later when a
+holiday falls in between. See [`api.md`](api.md#add_business_daysdt-days) for the full rules.
+
+Every calendar has its own timezone, but the start datetime must carry one too. With
+`USE_TZ = True`, `django.utils.timezone.now()` and `DateTimeField` values are already aware.
+With `USE_TZ = False`, or for a datetime built by hand, attach the calendar timezone first,
+otherwise the call raises `ValidationError`:
+
+```python
+from django.utils import timezone
+
+start = timezone.make_aware(naive_start, calendar.tz)
+due = calendar.add_business_days(start, 3)
+```
+
 ### Deadline helpers with Django services
 
-The deadline helpers are part of the stable public API and work naturally with `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`.
+The deadline helpers are part of the stable public API and work with calendars returned by `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`.
 
 ```python
 from datetime import timedelta
@@ -405,7 +434,7 @@ calendar = get_calendar_for(tenant="acme", region="cl")
 deadline = deadline_for(now(), timedelta(hours=8), calendar=calendar)
 ```
 
-Because deadline helpers are also available as `BusinessCalendar` instance methods, this is often the cleanest style in Django code:
+The same helpers are available as `BusinessCalendar` methods:
 
 ```python
 calendar = get_calendar_for(tenant="acme", region="cl")
@@ -414,7 +443,7 @@ deadline = calendar.deadline_for(now(), timedelta(hours=8))
 
 For calendars obtained through `get_default_calendar()`, `get_calendar(name)`, and `get_calendar_for(...)`, django-bizcal also attaches the logical `calendar_name` to the calendar instance. As a result, `deadline.calendar_name` is preserved automatically when you call `calendar.deadline_for(...)`.
 
-A realistic helpdesk flow looks like this:
+Helpdesk example:
 
 ```python
 from datetime import timedelta
@@ -425,7 +454,7 @@ calendar = get_calendar_for(tenant=ticket.tenant, region=ticket.region)
 deadline = calendar.deadline_for(ticket.created_at, timedelta(hours=8))
 ```
 
-See `examples/helpdesk_sla.py` for a fuller example including remaining time and breach checks.
+`examples/helpdesk_sla.py` extends this example with remaining time and breach checks.
 
 You can also resolve date-based due times directly:
 
@@ -440,7 +469,7 @@ month_end_cutoff = business_deadline_at_close(
 )
 ```
 
-For teams that prefer declarative rules over direct helper composition, use named deadline policies instead:
+With a named deadline policy:
 
 ```python
 from django_bizcal.django_api import compute_deadline
@@ -632,4 +661,5 @@ Useful in tests or reload scenarios after changing deadline-policy settings or c
 - Use `CalendarDayOverride` when a specific date needs reduced hours, split shifts, or a one-off intraday schedule.
 - Keep resolver logic thin: derive the logical name or config from business context, then let django-bizcal handle caching and persisted overrides.
 - Prefer shared context keys between calendar and deadline-policy resolvers so `compute_deadline(policy_name=None, ...)` can resolve both layers consistently.
-- Pass aware datetimes from Django models or `django.utils.timezone.now()`.
+- Pass aware datetimes from Django models or `django.utils.timezone.now()`. See
+  [Business-time arithmetic](#business-time-arithmetic) for naive values.

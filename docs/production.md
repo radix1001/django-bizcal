@@ -2,8 +2,8 @@
 
 ## Goals
 
-`django-bizcal` is designed to be embedded in production Django services where
-business-time behavior must stay predictable across:
+This guide covers running `django-bizcal` in Django services where business-time results
+must stay predictable across:
 
 - timezones
 - official holidays

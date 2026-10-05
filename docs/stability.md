@@ -55,8 +55,8 @@ Current CI combinations:
 
 ## Backward compatibility target for 1.x
 
-Before `1.0.0`, the project may still add focused hardening or small ergonomic
-improvements. Starting with `1.0.0`, the intent is:
+Before `1.0.0`, the project may still add features and adjust behavior in minor releases.
+Starting with `1.0.0`, the intent is:
 
 - no breaking changes to package-level public imports in `1.x` without a deprecation path
 - no silent semantic changes to documented business-time behavior
