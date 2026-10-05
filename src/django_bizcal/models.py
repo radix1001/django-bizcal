@@ -32,11 +32,11 @@ class CalendarHoliday(models.Model):  # type: ignore[misc]
         indexes = [
             models.Index(
                 fields=("calendar_name", "day"),
-                name="bizcal_holiday_calendar_day_idx",
+                name="bizcal_holiday_cal_day_idx",
             ),
             models.Index(
                 fields=("calendar_name", "is_active"),
-                name="bizcal_holiday_calendar_active_idx",
+                name="bizcal_holiday_cal_active_idx",
             ),
         ]
 
@@ -68,11 +68,11 @@ class CalendarDayOverride(models.Model):  # type: ignore[misc]
         indexes = [
             models.Index(
                 fields=("calendar_name", "day"),
-                name="bizcal_day_override_calendar_day_idx",
+                name="bizcal_override_cal_day_idx",
             ),
             models.Index(
                 fields=("calendar_name", "is_active"),
-                name="bizcal_day_override_calendar_active_idx",
+                name="bizcal_override_cal_active_idx",
             ),
         ]
 
