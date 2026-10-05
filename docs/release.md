@@ -80,7 +80,7 @@ In the GitHub repository:
 2. Optionally require manual approval for deployments to that environment
 3. Use GitHub Releases or manual workflow dispatch to publish
 
-Recommended hardening:
+Recommended restrictions:
 
 - Restrict the `pypi` environment to approved branches and tags
 - Require reviewer approval before deployment when appropriate
