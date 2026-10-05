@@ -1,5 +1,21 @@
 # Upgrading
 
+## 0.12.2
+
+Run `python manage.py migrate django_bizcal`. Migration `0004_shorten_index_names` renames
+four indexes so their names fit Django's 30-character limit:
+
+| Model | Old name | New name |
+| --- | --- | --- |
+| `CalendarHoliday` | `bizcal_holiday_calendar_day_idx` | `bizcal_holiday_cal_day_idx` |
+| `CalendarHoliday` | `bizcal_holiday_calendar_active_idx` | `bizcal_holiday_cal_active_idx` |
+| `CalendarDayOverride` | `bizcal_day_override_calendar_day_idx` | `bizcal_override_cal_day_idx` |
+| `CalendarDayOverride` | `bizcal_day_override_calendar_active_idx` | `bizcal_override_cal_active_idx` |
+
+Tables and rows are not modified. If a project added `models.E034` to
+`SILENCED_SYSTEM_CHECKS`, or ran `migrate --skip-checks`, to work around the error, that
+workaround can be removed.
+
 ## 0.12.1
 
 Documentation release. No code, configuration, or migration change is required.

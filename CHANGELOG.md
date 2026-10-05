@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.2
+
+- Fixed the Django system check errors `models.E034` raised for four index names longer than 30 characters on `CalendarHoliday` and `CalendarDayOverride`. Because of them, `manage.py check`, `migrate`, and `runserver` stopped with `SystemCheckError` in any project with `django_bizcal` in `INSTALLED_APPS`.
+- Added migration `0004_shorten_index_names`, which renames the existing indexes with `RenameIndex`. No table or data changes.
+- Added a test that runs Django's system checks for the app, so this class of error fails CI.
+
 ## 0.12.1
 
 - Documented `add_business_days(...)` in the README, the API reference, and the Django integration guide, including how naive datetimes are handled.
