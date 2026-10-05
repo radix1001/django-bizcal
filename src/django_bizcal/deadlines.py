@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from .calendars.base import BusinessCalendar, _resolve_render_tz
+from .calendars.base import BusinessCalendar, _resolve_render_tz, _snap_into_day
 from .exceptions import ValidationError
 from .intervals import BusinessInterval
 from .types import DateInput, RenderTzInput, TimeInput, coerce_date, coerce_time, ensure_aware
@@ -196,7 +196,7 @@ def _resolve_day_deadline(
         resolved = _closing_boundary(day, calendar=calendar, intervals=intervals)
     else:
         candidate = datetime.combine(day, _coerce_deadline_time(at), tzinfo=calendar.tz)
-        resolved = _snap_candidate_within_day(candidate, intervals)
+        resolved = _snap_into_day(candidate, intervals)
     if tz is None:
         return resolved
     return resolved.astimezone(_resolve_render_tz(tz))
@@ -225,15 +225,3 @@ def _closing_boundary(
 
 def _coerce_deadline_time(value: TimeInput) -> time:
     return coerce_time(value)
-
-
-def _snap_candidate_within_day(
-    candidate: datetime,
-    intervals: tuple[BusinessInterval, ...],
-) -> datetime:
-    for interval in intervals:
-        if candidate <= interval.start:
-            return interval.start
-        if interval.start <= candidate <= interval.end:
-            return candidate
-    return intervals[-1].end

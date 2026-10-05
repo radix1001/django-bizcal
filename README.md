@@ -80,6 +80,25 @@ deadline = regional.add_business_hours(start, 10)
 elapsed = regional.business_minutes_between(start, deadline)
 ```
 
+## Business days
+
+`add_business_days(...)` moves a datetime by whole business days and keeps its wall-clock
+time, skipping weekends and holidays:
+
+```python
+santiago = ZoneInfo("America/Santiago")
+wednesday = datetime(2026, 10, 7, 16, 30, tzinfo=santiago)
+
+assert cl.add_business_days(wednesday, 1) == datetime(2026, 10, 8, 16, 30, tzinfo=santiago)
+# Saturday, Sunday and the October 12 holiday are skipped.
+assert cl.add_business_days(wednesday, 3) == datetime(2026, 10, 13, 16, 30, tzinfo=santiago)
+assert cl.add_business_days(wednesday, -1) == datetime(2026, 10, 6, 16, 30, tzinfo=santiago)
+```
+
+A start outside business time is first moved to the next business datetime (the previous
+one for negative values), and a wall-clock time the target day does not cover snaps into
+that day, up to its closing.
+
 ## Overnight work blocks
 
 A block that starts one day and ends the next is a single schedule entry, written as

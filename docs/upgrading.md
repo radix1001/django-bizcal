@@ -1,5 +1,16 @@
 # Upgrading
 
+## 0.12.0
+
+Additive release. No configuration, migration, or code change is required.
+
+What to check when upgrading:
+
+- `add_business_days(start, days)` is now available on every calendar. If your project
+  wraps `BusinessDaysPolicy(..., at=start.time())` or loops over `next_business_day(...)` to
+  add business days to a datetime, you can replace that helper with the calendar method.
+  It rejects naive datetimes and returns the result in the timezone of `start`.
+
 ## 0.11.0
 
 Additive release for work blocks that cross midnight. No configuration change is required,
