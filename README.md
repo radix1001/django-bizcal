@@ -626,7 +626,7 @@ See the full documentation in:
 ## Compatibility
 
 - Python 3.11+
-- Officially tested against Django 5.2 LTS and 6.0
+- Officially tested against Django 5.2 LTS, 6.0 and 6.1
 - CI covers the supported upstream Python and Django combinations documented in [`docs/stability.md`](docs/stability.md)
 
 ## Limitations
