@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0
+
+- Added Django `6.1` to the supported dependency range, which moves from `Django>=5.2,<6.1` to `Django>=5.2,<6.2`. The floor is unchanged.
+- Added Python `3.12`, `3.13`, and `3.14` with Django `6.1` to the CI test matrix, and advertised `Framework :: Django :: 6.1` in the package metadata.
+- No code, configuration, or migration change: the test suite passes unchanged on Django `5.2`, `6.0`, and `6.1`.
+
 ## 0.12.2
 
 - Fixed the Django system check errors `models.E034` raised for four index names longer than 30 characters on `CalendarHoliday` and `CalendarDayOverride`. Because of them, `manage.py check`, `migrate`, and `runserver` stopped with `SystemCheckError` in any project with `django_bizcal` in `INSTALLED_APPS`.

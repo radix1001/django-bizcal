@@ -1,5 +1,11 @@
 # Upgrading
 
+## 0.13.0
+
+Compatibility release. No code, configuration, or migration change is required.
+
+- the package dependency range now allows Django `6.1` (`Django>=5.2,<6.2`)
+
 ## 0.12.2
 
 Run `python manage.py migrate django_bizcal`. Migration `0004_shorten_index_names` renames

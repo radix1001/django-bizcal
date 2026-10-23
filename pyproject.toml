@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-bizcal"
-version = "0.12.2"
+version = "0.13.0"
 description = "Composable business calendars for Django with holidays, intraday schedules, and timezone-aware operations."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -25,6 +25,7 @@ classifiers = [
   "Framework :: Django",
   "Framework :: Django :: 5.2",
   "Framework :: Django :: 6.0",
+  "Framework :: Django :: 6.1",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
@@ -38,7 +39,7 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "Django>=5.2,<6.1",
+  "Django>=5.2,<6.2",
   "holidays>=0.58,<1.0",
 ]
 

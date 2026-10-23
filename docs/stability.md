@@ -32,6 +32,7 @@ Current actively tested Django lines:
 
 - Django `5.2` LTS
 - Django `6.0`
+- Django `6.1`
 
 Current actively tested Python lines:
 
@@ -52,6 +53,9 @@ Current CI combinations:
 - Python `3.12` with Django `6.0`
 - Python `3.13` with Django `6.0`
 - Python `3.14` with Django `6.0`
+- Python `3.12` with Django `6.1`
+- Python `3.13` with Django `6.1`
+- Python `3.14` with Django `6.1`
 
 ## Backward compatibility target for 1.x
 
